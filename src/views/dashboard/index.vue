@@ -246,6 +246,21 @@ const uploadedMediaType = ref<'image' | 'video' | ''>('')
 const uploadRef = ref<any>(null)
 const currentFile = ref<File | null>(null)
 
+const currentTaskId = ref<number | null>(null)
+const pollTimer = ref<ReturnType<typeof setInterval> | null>(null)
+
+const analysisResult = reactive({
+  status: 0,
+  progress: 0,
+  attendanceCount: 0,
+  totalScore: 0,
+  details: [] as Array<{
+    behaviorType: string
+    count: number
+    boundingBoxes?: number[][]
+  }>
+})
+
 const userStore = useUserStore()
 let wsManager: WebSocketManager | null = null
 let captureTimer: ReturnType<typeof setInterval> | undefined = undefined
@@ -394,12 +409,13 @@ const handleFileChange = (file: any) => {
 const attendanceRate = ref(0)
 const focusScore = ref(0)
 const behaviorData = reactive({
+  '举手回答问题': 0,
+  '阅读': 0,
   '趴桌': 0,
+  '起立回答问题': 0,
   '玩手机': 0,
-  '举手互动': 0,
-  '阅读课本': 0,
-  '埋头笔记': 0,
-  '回答问题': 0,  
+  '书写': 0,
+  '正常听课': 0
 })
 
 const toggleAnalysis = () => {
@@ -427,35 +443,134 @@ const submitTask = async () => {
     ElMessage.warning('请选择要关联的排课信息！')
     return
   }
-  
+
   loadingToggle.value = true
-  
+
+  // 清空旧结果
+  currentTaskId.value = null
+  analysisResult.status = 0
+  analysisResult.progress = 0
+  analysisResult.attendanceCount = 0
+  analysisResult.totalScore = 0
+  analysisResult.details = []
+  attendanceRate.value = 0
+  focusScore.value = 0
+  Object.keys(behaviorData).forEach(k => {
+    behaviorData[k as keyof typeof behaviorData] = 0
+  })
+
   try {
     const formData = new FormData()
     formData.append('file', currentFile.value)
     formData.append('fileName', currentFile.value.name)
     formData.append('scheduleId', String(selectedClass.value))
     formData.append('streamType', '2')
-    
-    // axios 会自动识别 FormData 并设置 Content-Type: multipart/form-data
-    const res: any = await request({ 
-      url: '/analysis/task', 
-      method: 'post', 
-      data: formData 
-    })
-    
-    // axios 拦截器可能会直接抛出异常，或者返回包含 code 的响应体
-    if (res && res.code !== undefined && res.code !== 200) {
-      ElMessage.error(res.message || '后端返回错误信息，任务创建失败')
-      return
-    }
 
-    ElMessage.success('分析任务创建成功，AI 正在快马加鞭识别中！')
+    const res: any = await request({
+      url: '/analysis/task',
+      method: 'post',
+      data: formData
+    })
+
+    // request.js 已经返回 res.data，所以这里 res 直接就是 { taskId, status }
+    currentTaskId.value = res.taskId
+    analysisResult.status = res.status || 0
+    isAnalyzing.value = true
+
+    ElMessage.success('分析任务创建成功，开始轮询分析结果...')
+    startPolling(res.taskId)
   } catch (error: any) {
     ElMessage.error(error?.response?.data?.message || error.message || '任务创建失败，请稍后重试')
-  } finally {
     loadingToggle.value = false
   }
+}
+
+const stopPolling = () => {
+  if (pollTimer.value) {
+    clearInterval(pollTimer.value)
+    pollTimer.value = null
+  }
+}
+
+const fetchTaskStatus = async (taskId: number) => {
+  return await request({
+    url: `/analysis/task/${taskId}/status`,
+    method: 'get'
+  })
+}
+
+// 这个接口需要后端补充：GET /api/v1/analysis/task/{taskId}/detail
+const fetchTaskDetail = async (taskId: number) => {
+  return await request({
+    url: `/analysis/task/${taskId}/detail`,
+    method: 'get'
+  })
+}
+
+const startPolling = (taskId: number) => {
+  stopPolling()
+
+  pollTimer.value = setInterval(async () => {
+    try {
+      const statusRes: any = await fetchTaskStatus(taskId)
+
+      analysisResult.status = statusRes.status || 0
+      analysisResult.progress = statusRes.progress || 0
+      analysisResult.attendanceCount = statusRes.attendanceCount || 0
+      analysisResult.totalScore = statusRes.totalScore || 0
+
+      // 同步到页面已有统计卡片
+      attendanceRate.value = analysisResult.attendanceCount
+      focusScore.value = analysisResult.totalScore
+
+      // 分析成功
+      if (statusRes.status === 2) {
+  stopPolling()
+  loadingToggle.value = false
+  isAnalyzing.value = false
+
+  try {
+    const detailRes: any = await fetchTaskDetail(taskId)
+
+    analysisResult.attendanceCount = detailRes.attendanceCount || analysisResult.attendanceCount
+    analysisResult.totalScore = detailRes.totalScore || analysisResult.totalScore
+    analysisResult.details = detailRes.details || []
+
+    attendanceRate.value = analysisResult.attendanceCount
+    focusScore.value = analysisResult.totalScore
+
+    // 先清零，再回填行为统计
+    Object.keys(behaviorData).forEach(k => {
+      behaviorData[k as keyof typeof behaviorData] = 0
+    })
+
+    analysisResult.details.forEach((item: any) => {
+      if (item.behaviorType in behaviorData) {
+        behaviorData[item.behaviorType as keyof typeof behaviorData] = item.count || 0
+      }
+    })
+
+    ElMessage.success('分析完成，结果已更新到页面')
+  } catch (e) {
+    console.error('拉取任务详情失败', e)
+    ElMessage.warning('分析已完成，但详情加载失败')
+  }
+}
+
+      // 分析失败
+     if (statusRes.status === 3) {
+  stopPolling()
+  loadingToggle.value = false
+  isAnalyzing.value = false
+  ElMessage.error('分析失败，请稍后重试')
+}
+    } catch (error) {
+      console.error('轮询任务状态失败', error)
+      stopPolling()
+      loadingToggle.value = false
+      ElMessage.error('获取分析状态失败')
+    }
+  }, 2000)
 }
 
 const startAnalysis = () => {
@@ -506,6 +621,8 @@ const stopAnalysis = () => {
   ElMessage.warning({ message: '分析已停止', grouping: true })
   
   stopCapture()
+  stopPolling()
+  currentTaskId.value = null
   
   if (wsManager) {
     wsManager.close()
@@ -584,7 +701,7 @@ const drawRealBoxes = (details: any[]) => {
   details.forEach(detail => {
     const behavior = detail.behaviorType
     // Dictionary check
-    const negative = ['玩电子产品', '趴桌睡觉', '交头接耳', '左顾右盼', '玩手机', '趴桌']
+    const negative = ['玩手机', '趴桌']
     const isNegative = negative.includes(behavior)
     
     const color = isNegative ? '#ef4444' : '#10b981'
@@ -619,14 +736,18 @@ const drawRealBoxes = (details: any[]) => {
 }
 
 const getBehaviorDotColor = (name: string) => {
-  const negative = ['玩电子产品', '趴桌睡觉', '交头接耳', '左顾右盼', '玩手机', '趴桌']
-  const neutral = ['阅读课本', '举手互动']
+  const negative = ['玩手机', '趴桌']
+  const positive = ['举手回答问题', '起立回答问题']
+  const normal = ['阅读', '书写', '正常听课']
+
   if (negative.includes(name)) return 'bg-red-500'
-  if (neutral.includes(name)) return 'bg-amber-400'
-  return 'bg-emerald-500'
+  if (positive.includes(name)) return 'bg-amber-400'
+  if (normal.includes(name)) return 'bg-emerald-500'
+  return 'bg-gray-400'
 }
 
 onUnmounted(() => {
+  stopPolling()
   stopAnalysis()
   stopCamera()
 })
