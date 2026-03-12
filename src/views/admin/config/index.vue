@@ -181,16 +181,34 @@
             <el-input v-model="formData.description" type="textarea" :rows="2" placeholder="补充说明适用场景" maxlength="200" />
           </el-form-item>
           
-          <el-form-item label="行为权重定义 (JSON Array格式)" prop="config_content">
-            <el-input 
-              v-model="formData.config_content" 
-              type="textarea" 
-              :rows="8" 
-              placeholder='[{"behaviorType":"listening", "name":"听讲", "weight": 5}]'
-              class="font-mono text-sm shadow-inner"
-            />
-            <div class="text-xs text-gray-400 mt-2">支持的 behaviorType 参照文档说明，建议通过外部 JSON 工具校验格式。</div>
-          </el-form-item>
+          <el-form-item label="行为权重设置" prop="config_content">
+  <div class="w-full border border-gray-200 rounded-lg overflow-hidden">
+    <div
+      v-for="(item, index) in formData.config_content"
+      :key="item.behaviorType"
+      class="flex items-center gap-4 px-4 py-3 border-b last:border-b-0 bg-white"
+    >
+      <div class="w-40 text-sm font-medium text-gray-700">
+        {{ item.name }}
+      </div>
+
+      <div class="flex-1">
+        <el-input-number
+          v-model="item.weight"
+          :precision="2"
+          :step="1"
+          controls-position="right"
+          class="!w-full"
+          placeholder="请输入权重"
+        />
+      </div>
+    </div>
+  </div>
+
+  <div class="text-xs text-gray-400 mt-2">
+    行为类别已固定为系统预设的 7 种，当前页面仅允许修改各行为对应的权重值。
+  </div>
+</el-form-item>
           
           <el-form-item v-if="dialogType === 'add'">
             <div class="flex items-center space-x-2 bg-indigo-50 px-3 py-2 rounded">
@@ -340,61 +358,108 @@ const dialogType = ref('add')
 const submitLoading = ref(false)
 const formRef = ref(null)
 
+const FIXED_BEHAVIORS = [
+  { behaviorType: '举手回答问题', name: '举手回答问题', weight: 0 },
+  { behaviorType: '阅读', name: '阅读', weight: 0 },
+  { behaviorType: '趴桌', name: '趴桌', weight: 0 },
+  { behaviorType: '起立回答问题', name: '起立回答问题', weight: 0 },
+  { behaviorType: '玩手机', name: '玩手机', weight: 0 },
+  { behaviorType: '书写', name: '书写', weight: 0 },
+  { behaviorType: '正常听课', name: '正常听课', weight: 0 }
+]
+
 const formData = reactive({
   id: null,
   config_name: '',
   description: '',
   is_active: 0,
-  config_content: ''
+  config_content: JSON.parse(JSON.stringify(FIXED_BEHAVIORS))
 })
 
-const validateJSON = (rule, value, callback) => {
-  if (!value) {
-    callback(new Error('请输入具体的权重JSON映射！'))
+const validateBehaviorWeights = (rule, value, callback) => {
+  if (!Array.isArray(value)) {
+    callback(new Error('行为权重配置格式错误'))
     return
   }
-  try {
-    const arr = JSON.parse(value)
-    if (!Array.isArray(arr)) {
-      callback(new Error('最外层必须为 JSON Array 数组格式 []'))
-      return
-    }
-    // Simple basic validation
-    if (arr.length > 0 && !arr[0].behaviorType) {
-      callback(new Error('至少要包含有效的 behaviorType 键名'))
-      return
-    }
-    callback()
-  } catch(e) {
-    callback(new Error('格式不符合严格 JSON 标准（须双引号包裹键名等），请检查！'))
+
+  if (value.length !== 7) {
+    callback(new Error('行为权重必须且只能包含固定的7种行为'))
+    return
   }
+
+  const fixedTypes = FIXED_BEHAVIORS.map(item => item.behaviorType)
+  const currentTypes = value.map(item => item.behaviorType)
+
+  const allMatched =
+    fixedTypes.every(type => currentTypes.includes(type)) &&
+    currentTypes.every(type => fixedTypes.includes(type))
+
+  if (!allMatched) {
+    callback(new Error('行为类别必须严格固定为系统预设的7种'))
+    return
+  }
+
+  const hasInvalidWeight = value.some(item =>
+    item.weight === '' ||
+    item.weight === null ||
+    item.weight === undefined ||
+    Number.isNaN(Number(item.weight))
+  )
+
+  if (hasInvalidWeight) {
+    callback(new Error('请为每种行为填写合法的数值权重'))
+    return
+  }
+
+  callback()
 }
 
 const rules = reactive({
   config_name: [{ required: true, message: '请填写配置方案缩略名', trigger: 'blur' }],
-  config_content: [{ validator: validateJSON, trigger: 'blur' }]
+  config_content: [{ validator: validateBehaviorWeights, trigger: 'blur' }]
 })
 
 const resetForm = () => {
   if (formRef.value) formRef.value.resetFields()
-  Object.assign(formData, { id: null, config_name: '', description: '', is_active: 0, config_content: '' })
+  Object.assign(formData, {
+    id: null,
+    config_name: '',
+    description: '',
+    is_active: 0,
+    config_content: JSON.parse(JSON.stringify(FIXED_BEHAVIORS))
+  })
 }
-
 const handleAdd = () => {
   dialogType.value = 'add'
   resetForm()
-  formData.config_content = "[\n  {\"behaviorType\": \"listening\", \"name\": \"听讲\", \"weight\": 5.0}\n]"
+  formData.config_content = JSON.parse(JSON.stringify(FIXED_BEHAVIORS))
   dialogVisible.value = true
 }
 
 const handleEdit = (row) => {
   dialogType.value = 'edit'
   resetForm()
-  Object.assign(formData, { ...row })
-  // 整理格式化 JSON string 回填
+
+  formData.id = row.id
+  formData.config_name = row.config_name
+  formData.description = row.description
+  formData.is_active = row.is_active
+
   try {
-    formData.config_content = JSON.stringify(JSON.parse(row.config_content), null, 2)
-  } catch(e) {}
+    const parsed = JSON.parse(row.config_content || '[]')
+
+    formData.config_content = FIXED_BEHAVIORS.map(fixed => {
+      const matched = parsed.find(item => item.behaviorType === fixed.behaviorType)
+      return {
+        behaviorType: fixed.behaviorType,
+        name: fixed.name,
+        weight: matched ? Number(matched.weight) : 0
+      }
+    })
+  } catch (e) {
+    formData.config_content = JSON.parse(JSON.stringify(FIXED_BEHAVIORS))
+  }
+
   dialogVisible.value = true
 }
 
@@ -420,14 +485,15 @@ const handleSubmit = () => {
   formRef.value.validate(async (valid) => {
     if (valid) {
       submitLoading.value = true
-      
-      const payload = { ...formData }
-      // 压缩 JSON
-      payload.config_content = JSON.stringify(JSON.parse(formData.config_content))
-      
+
+      const payload = {
+        ...formData,
+        // 这里 formData.config_content 已经是数组，不再 JSON.parse
+        config_content: JSON.stringify(formData.config_content)
+      }
+
       try {
         if (dialogType.value === 'add') {
-          // 在新增时传递 is_active 将后端一同激活
           await request({
             url: '/admin/config',
             method: 'post',
@@ -440,7 +506,6 @@ const handleSubmit = () => {
           })
           ElMessage.success('配置方案建立成果，参数保存落库。')
         } else {
-          // 修改操作
           await request({
             url: '/admin/config',
             method: 'put',
@@ -453,7 +518,7 @@ const handleSubmit = () => {
           })
           ElMessage.success('成功修改现有的参数映射版本！')
         }
-        
+
         dialogVisible.value = false
         fetchData()
       } catch (error) {
