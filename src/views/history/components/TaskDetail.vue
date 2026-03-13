@@ -167,19 +167,14 @@ const taskData = reactive({
   status: null,
   totalScore: 0,
   attendanceCount: 0,
-  fileUrl: '', 
-  behaviors: [] 
+  fileUrl: '',
+  behaviors: [],
+  detailList: []
 })
 
 // 中文行为映射表
 const getBehaviorName = (type) => {
-  const map = {
-    listening: '认真听讲',
-    playing_phone: '玩弄手机/机器',
-    sleeping: '趴桌睡觉',
-    raising_hand: '举手互动'
-  }
-  return map[type] || type
+  return type || '-'
 }
 
 /**
@@ -194,6 +189,22 @@ const open = async (row) => {
     const res = await getReportDetail(row.id)
     if (res) {
       const data = res
+      const normalizedDetailList = Array.isArray(data.detailList)
+      ? data.detailList.map(item => {
+          const boxes = Array.isArray(item.boundingBoxes) ? item.boundingBoxes : []
+          const rawCount = Number(item.count || 0)
+
+          return {
+            recordType: item.recordType,
+            frameTime: Number(item.frameTime || 0),
+            behaviorType: item.behaviorType || '',
+            count: boxes.length > 0 ? boxes.length : rawCount,
+            boundingBoxes: boxes,
+            snapshotUrl: item.snapshotUrl || null
+          }
+        })
+      : []
+
       Object.assign(taskData, {
         id: data.id,
         courseName: data.courseName,
@@ -204,12 +215,13 @@ const open = async (row) => {
         status: data.status,
         totalScore: data.totalScore ? Number(data.totalScore) : 0,
         attendanceCount: data.attendanceCount || 0,
-        behaviors: data.detailList ? data.detailList.map(item => ({
+        fileUrl: data.fileUrl || '',
+        detailList: normalizedDetailList,
+        behaviors: normalizedDetailList.map(item => ({
           type: item.behaviorType,
-          name: getBehaviorName(item.behaviorType),
+          name: item.behaviorType,
           count: item.count
-        })) : [],
-        fileUrl: data.fileUrl || ''
+        }))
       })
     } else {
       ElMessage.error('获取详情失败')
@@ -226,11 +238,18 @@ defineExpose({ open })
 
 const handleClose = () => {
   // 重置状态
-  Object.keys(taskData).forEach(key => {
-    if (key === 'totalScore' || key === 'attendanceCount') taskData[key] = 0
-    else if (key === 'behaviors') taskData[key] = []
-    else taskData[key] = ''
-  })
+ taskData.id = ''
+  taskData.courseName = ''
+  taskData.teacherName = ''
+  taskData.classroomName = ''
+  taskData.mediaType = null
+  taskData.createdAt = ''
+  taskData.status = null
+  taskData.totalScore = 0
+  taskData.attendanceCount = 0
+  taskData.fileUrl = ''
+  taskData.behaviors = []
+  taskData.detailList = []
 }
 
 const handleDownloadReport = async () => {
