@@ -1,13 +1,5 @@
 <template>
   <div class="data-dashboard-container">
-    <!-- 调试用角色切换器 (接入真实接口时可删除此模块) -->
-    <div class="dashboard-header mb-4 flex justify-end">
-      <el-radio-group v-model="currentUser.role" @change="handleRoleChange" size="small">
-        <el-radio-button :label="1">管理员视角</el-radio-button>
-        <el-radio-button :label="0">普通教师视角</el-radio-button>
-      </el-radio-group>
-    </div>
-
     <!-- 模块 1: 核心 KPI 卡片 -->
     <el-row :gutter="20" class="mb-4 kpi-row">
       <el-col :span="8" v-for="(kpi, index) in kpiData" :key="index">
@@ -23,26 +15,26 @@
       </el-col>
     </el-row>
 
-    <!-- 图表展示区域: 1-1 上下布局 或 左右分栏 flex 布局 -->
+    <!-- 图表展示区域 -->
     <el-row :gutter="20" class="chart-row mb-4">
       <!-- 模块 2: 饼图/环形图 -->
       <el-col :span="12">
         <el-card shadow="hover" class="chart-card">
           <template #header>
             <div class="card-header font-bold text-gray-700">
-              各行为占比画像
+              {{ dashboardData.pieTitle }}
             </div>
           </template>
           <div class="chart-container" ref="pieChartRef"></div>
         </el-card>
       </el-col>
 
-      <!-- 模块 4: 横向排行柱状图 -->
+      <!-- 模块 3: 横向排行柱状图 -->
       <el-col :span="12">
         <el-card shadow="hover" class="chart-card">
           <template #header>
             <div class="card-header font-bold text-gray-700">
-              {{ currentUser.role === 1 ? '全校各学院专注度排行 Top 5' : '我的班级专注度排行' }}
+              {{ dashboardData.barTitle }}
             </div>
           </template>
           <div class="chart-container" ref="barChartRef"></div>
@@ -50,13 +42,13 @@
       </el-col>
     </el-row>
 
-    <!-- 模块 3: 底部折线图 -->
+    <!-- 模块 4: 底部折线图 -->
     <el-row :gutter="20">
       <el-col :span="24">
         <el-card shadow="hover" class="chart-card">
           <template #header>
             <div class="card-header font-bold text-gray-700">
-              近七日课堂专注度趋势
+              {{ dashboardData.lineTitle }}
             </div>
           </template>
           <div class="chart-container line-chart-container" ref="lineChartRef"></div>
@@ -68,147 +60,166 @@
 
 <script setup name="DataDashboard">
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
+import { getDashboardOverview } from './api/index'
 
 // ============================================
-// 一、 模拟全局状态：当前登录用户信息
+// 一、真实接口数据状态
 // ============================================
-// role: 1 代表超级管理员, 0 代表普通老师
-const currentUser = ref({
-  emp_no: 'T001',
-  name: '张老师',
-  role: 0 
-})
-
-// 角色切换事件处理 (接入真实接口后可删除)
-const handleRoleChange = () => {
-  nextTick(() => {
-    // 重新渲染图表数据
-    renderCharts()
-  })
-}
-
-
-// ============================================
-// 二、 Mock 数据工厂
-// ============================================
-// 根据提取自原数据库业务梳理提取的假数据
-const mockDataStore = {
-  // role: 1 超级管理员数据
-  ADMIN: {
-    kpi: [
-      { label: '全校累计排课数', value: 12560, unit: '节' },
-      { label: '全校累计分析人次', value: 345890, unit: '次' },
-      { label: '全校平均专注度得分', value: 87.5, unit: '分' }
-    ],
-    // 对应 analysis_detail 分类
-    pie: [
-      { name: '认真听讲', value: 65000 },
-      { name: '举手互动', value: 15000 },
-      { name: '低头玩手机', value: 8000 },
-      { name: '趴桌睡觉', value: 5000 },
-      { name: '发呆/左顾右盼', value: 7000 }
-    ],
-    line: [85, 86, 88, 87, 86, 89, 87.5],
-    bar: [
-      { name: '计算机学院', value: 92.5 },
-      { name: '软件学院', value: 91.0 },
-      { name: '人工智能学院', value: 89.5 },
-      { name: '经管学院', value: 86.0 },
-      { name: '外国语学院', value: 84.5 }
-    ]
+const dashboardData = ref({
+  role: 0,
+  userInfo: {
+    empNo: '',
+    name: '',
+    role: 0,
+    department: ''
   },
-  // role: 0 普通教师数据
-  TEACHER: {
-    kpi: [
-      { label: '本学期授课课时数', value: 64, unit: '节' },
-      { label: '课堂平均出勤率', value: 96.8, unit: '%' },
-      { label: '我的课堂平均得分', value: 85.2, unit: '分' }
-    ],
-    pie: [
-      { name: '认真听讲', value: 1200 },
-      { name: '举手互动', value: 300 },
-      { name: '低头玩手机', value: 150 },
-      { name: '趴桌睡觉', value: 50 },
-      { name: '发呆/左顾右盼', value: 100 }
-    ],
-    line: [82, 84, 85, 83, 86, 88, 85.2],
-    bar: [
-      { name: '软件工程2301班', value: 88.5 },
-      { name: '软件工程2302班', value: 86.0 },
-      { name: '计算机科学2301班', value: 84.5 },
-      { name: '网络工程2401班', value: 81.0 }
-    ]
-  }
-}
-
-// 基于当前角色动态计算的数据上下文
-const currentData = computed(() => {
-  return currentUser.value.role === 1 ? mockDataStore.ADMIN : mockDataStore.TEACHER
+  kpi: [],
+  pieTitle: '各行为占比画像',
+  pie: [],
+  barTitle: '',
+  bar: [],
+  lineTitle: '近七日课堂平均专注度趋势',
+  lineDates: [],
+  lineValues: []
 })
 
-const kpiData = computed(() => currentData.value.kpi)
+const loading = ref(false)
 
-// 工具：获取近七天 (MM-DD)
-const getLast7DaysString = () => {
-  const days = []
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date()
-    d.setDate(d.getDate() - i)
-    days.push(`${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`)
-  }
-  return days
-}
-
+const kpiData = computed(() => dashboardData.value.kpi || [])
 
 // ============================================
-// 三、 ECharts 渲染逻辑 (浅色企业级主题)
+// 二、ECharts DOM / 实例
 // ============================================
-
-// DOM Nodes
 const pieChartRef = ref(null)
 const barChartRef = ref(null)
 const lineChartRef = ref(null)
 
-// Instances
 let chartInstances = {
   pie: null,
   bar: null,
   line: null
 }
 
-// 主题配色 (Element 规范、清新、数据标准色)
+// ============================================
+// 三、主题配色
+// ============================================
 const colorTheme = {
-  primary: '#409EFF',   // 听讲/主要
-  success: '#67C23A',   // 互动
-  warning: '#E6A23C',   // 手机/发呆
-  danger: '#F56C6C',    // 睡觉
-  info: '#909399',      // 发呆
+  primary: '#409EFF',
+  success: '#67C23A',
+  warning: '#E6A23C',
+  danger: '#F56C6C',
+  info: '#909399',
   lineGradStart: 'rgba(64, 158, 255, 0.4)',
   lineGradEnd: 'rgba(64, 158, 255, 0.05)',
   barGradStart: '#79bbff',
   barGradEnd: '#409EFF',
-  textDefault: '#606266', // 核心文字
-  lineSplit: '#EBEEF5'    // 分割线
+  textDefault: '#606266',
+  lineSplit: '#EBEEF5'
 }
 
-// 初始化图表实例
+// ============================================
+// 四、初始化图表实例
+// ============================================
 const initCharts = () => {
-  if (pieChartRef.value && !chartInstances.pie) chartInstances.pie = echarts.init(pieChartRef.value)
-  if (barChartRef.value && !chartInstances.bar) chartInstances.bar = echarts.init(barChartRef.value)
-  if (lineChartRef.value && !chartInstances.line) chartInstances.line = echarts.init(lineChartRef.value)
+  if (pieChartRef.value && !chartInstances.pie) {
+    chartInstances.pie = echarts.init(pieChartRef.value)
+  }
+  if (barChartRef.value && !chartInstances.bar) {
+    chartInstances.bar = echarts.init(barChartRef.value)
+  }
+  if (lineChartRef.value && !chartInstances.line) {
+    chartInstances.line = echarts.init(lineChartRef.value)
+  }
 }
 
-// 装载图表 Option 渲染
-const renderCharts = () => {
-  const data = currentData.value
+// ============================================
+// 五、请求真实数据
+// ============================================
+const fetchDashboardData = async () => {
+  loading.value = true
+  try {
+    const res = await getDashboardOverview({ days: 7 })
 
-  // [1] 饼图/环形图
+    dashboardData.value = {
+      role: res.role ?? 0,
+      userInfo: res.userInfo || {
+        empNo: '',
+        name: '',
+        role: 0,
+        department: ''
+      },
+      kpi: (res.kpi || []).map(item => ({
+        label: item.label || '',
+        value: Number(item.value ?? 0),
+        unit: item.unit || ''
+      })),
+      pieTitle: res.pieTitle || '各行为占比画像',
+      pie: (res.pie || []).map(item => ({
+        name: item.name || '-',
+        value: Number(item.value ?? 0)
+      })),
+      barTitle: res.barTitle || '',
+      bar: (res.bar || []).map(item => ({
+        name: item.name || '-',
+        value: Number(item.value ?? 0)
+      })),
+      lineTitle: res.lineTitle || '近七日课堂平均专注度趋势',
+      lineDates: res.lineDates || [],
+      lineValues: (res.lineValues || []).map(v => Number(v ?? 0))
+    }
+
+    nextTick(() => {
+      renderCharts()
+    })
+  } catch (error) {
+    console.error('获取数据大屏数据失败', error)
+    ElMessage.error('获取数据大屏数据失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+// ============================================
+// 六、渲染图表
+// ============================================
+const renderCharts = () => {
+  const data = dashboardData.value
+
+  const safePieData = (data.pie || []).map(item => ({
+    name: item.name || '-',
+    value: Number(item.value ?? 0)
+  }))
+
+  const safeBarData = (data.bar || []).map(item => ({
+    name: item.name || '-',
+    value: Number(item.value ?? 0)
+  }))
+
+  const safeLineValues = (data.lineValues || []).map(v => Number(v ?? 0))
+
+  // [1] 饼图
   if (chartInstances.pie) {
     chartInstances.pie.setOption({
-      tooltip: { trigger: 'item', backgroundColor: 'rgba(255, 255, 255, 0.9)' },
-      legend: { bottom: '0%', left: 'center', textStyle: { color: colorTheme.textDefault } },
-      color: [colorTheme.primary, colorTheme.success, colorTheme.warning, colorTheme.danger, colorTheme.info],
+      tooltip: {
+        trigger: 'item',
+        backgroundColor: 'rgba(255, 255, 255, 0.95)'
+      },
+      legend: {
+        bottom: '0%',
+        left: 'center',
+        textStyle: { color: colorTheme.textDefault }
+      },
+      color: [
+        colorTheme.primary,
+        colorTheme.success,
+        colorTheme.warning,
+        colorTheme.danger,
+        colorTheme.info,
+        '#8B5CF6',
+        '#14B8A6'
+      ],
       series: [
         {
           name: '行为占比',
@@ -216,31 +227,64 @@ const renderCharts = () => {
           radius: ['45%', '70%'],
           center: ['50%', '42%'],
           avoidLabelOverlap: false,
-          itemStyle: { borderRadius: 4, borderColor: '#fff', borderWidth: 2 },
+          itemStyle: {
+            borderRadius: 4,
+            borderColor: '#fff',
+            borderWidth: 2
+          },
           label: { show: false, position: 'center' },
           emphasis: {
-            label: { show: true, fontSize: 18, fontWeight: 'bold', color: colorTheme.textDefault, formatter: '{b}\n{d}%' }
+            label: {
+              show: true,
+              fontSize: 18,
+              fontWeight: 'bold',
+              color: colorTheme.textDefault,
+              formatter: '{b}\n{d}%'
+            }
           },
           labelLine: { show: false },
-          data: data.pie
+          data: safePieData
         }
       ]
     })
   }
 
-  // [2] 柱状排行榜（反向横放）
+  // [2] 柱状图
   if (chartInstances.bar) {
-    const barDataCopy = [...data.bar].reverse()
+   const barDataCopy = [...safeBarData].reverse()
+
     chartInstances.bar.setOption({
-      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-      grid: { left: '3%', right: '10%', bottom: '5%', top: '5%', containLabel: true },
-      xAxis: { type: 'value', max: 100, splitLine: { lineStyle: { color: colorTheme.lineSplit, type: 'dashed' } } },
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'shadow' }
+      },
+      grid: {
+        left: '3%',
+        right: '10%',
+        bottom: '5%',
+        top: '5%',
+        containLabel: true
+      },
+      xAxis: {
+        type: 'value',
+        max: 100,
+        splitLine: {
+          lineStyle: {
+            color: colorTheme.lineSplit,
+            type: 'dashed'
+          }
+        }
+      },
       yAxis: {
         type: 'category',
         data: barDataCopy.map(d => d.name),
         axisTick: { show: false },
         axisLine: { lineStyle: { color: '#DCDFE6' } },
-        axisLabel: { color: colorTheme.textDefault, width: 90, overflow: 'truncate' }
+        axisLabel: {
+          color: colorTheme.textDefault,
+          width: 120,
+          overflow: 'truncate'
+        }
       },
       series: [
         {
@@ -254,30 +298,47 @@ const renderCharts = () => {
             ]),
             borderRadius: [0, 4, 4, 0]
           },
-          label: { show: true, position: 'right', color: colorTheme.primary, formatter: '{c}分', fontWeight: 600 },
+          label: {
+            show: true,
+            position: 'right',
+            color: colorTheme.primary,
+            formatter: '{c}分',
+            fontWeight: 600
+          },
           data: barDataCopy.map(d => d.value)
         }
       ]
     })
   }
 
-  // [3] 折线图趋势
+  // [3] 折线图
   if (chartInstances.line) {
     chartInstances.line.setOption({
       tooltip: { trigger: 'axis' },
-      grid: { left: '2%', right: '3%', bottom: '5%', top: '15%', containLabel: true },
+      grid: {
+        left: '2%',
+        right: '3%',
+        bottom: '5%',
+        top: '15%',
+        containLabel: true
+      },
       xAxis: {
         type: 'category',
         boundaryGap: false,
-        data: getLast7DaysString(),
+        data: data.lineDates || [],
         axisLine: { lineStyle: { color: '#DCDFE6' } },
         axisLabel: { color: colorTheme.textDefault }
       },
       yAxis: {
         type: 'value',
         max: 100,
-        min: 0, // 可以改为通过打底分数动态min提升折线波动视觉效果
-        splitLine: { lineStyle: { color: colorTheme.lineSplit, type: 'dashed' } },
+        min: 0,
+        splitLine: {
+          lineStyle: {
+            color: colorTheme.lineSplit,
+            type: 'dashed'
+          }
+        },
         axisLabel: { color: colorTheme.textDefault }
       },
       series: [
@@ -294,54 +355,50 @@ const renderCharts = () => {
               { offset: 1, color: colorTheme.lineGradEnd }
             ])
           },
-          data: data.line
+          data: safeLineValues
         }
       ]
     })
   }
 }
 
-// 容器自适应缩放（取消了 Scale，直接依靠 resize 事件重排）
+// ============================================
+// 七、窗口缩放自适应
+// ============================================
 const handleResize = () => {
   chartInstances.pie?.resize()
   chartInstances.bar?.resize()
   chartInstances.line?.resize()
 }
 
+// ============================================
+// 八、生命周期
+// ============================================
 onMounted(() => {
   window.addEventListener('resize', handleResize)
-  nextTick(() => {
+  nextTick(async () => {
     initCharts()
-    renderCharts()
+    await fetchDashboardData()
   })
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
-  // 销毁全量实例保护内存
   Object.values(chartInstances).forEach(ins => {
-    if(ins) ins.dispose()
+    if (ins) ins.dispose()
   })
 })
 </script>
 
 <style scoped>
-/* 
-  企业级标准浅色后台风格
-  去除了绝对定位，回归标准普通流的相对结构
-*/
 .data-dashboard-container {
   padding: 20px;
   background-color: #f0f2f5;
-  min-height: calc(100vh - 84px); /* 预留给外部Navbar减去的高度，此处随意不影响排版 */
+  min-height: calc(100vh - 84px);
   font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Microsoft YaHei', sans-serif;
   color: #333;
 }
 
-.dashboard-header {
-  display: flex;
-  justify-content: flex-end;
-}
 /* 覆盖 el-card 的部分内边距控制紧凑型 */
 :deep(.el-card__body) {
   padding: 20px;
@@ -362,7 +419,7 @@ onUnmounted(() => {
   margin: 0;
 }
 
-/* Flex 工具模拟 (如已有 tailwind 可省略，保险起见手写) */
+/* Flex 工具模拟 */
 .mb-4 { margin-bottom: 20px; }
 .mr-3 { margin-right: 12px; }
 .mt-1 { margin-top: 4px; }
@@ -383,7 +440,7 @@ onUnmounted(() => {
 
 /* 图表容器统一高度管控 */
 .chart-card {
-  height: 380px; 
+  height: 380px;
   display: flex;
   flex-direction: column;
 }
