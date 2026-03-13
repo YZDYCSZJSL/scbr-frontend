@@ -75,15 +75,19 @@
              <div v-show="uploadedMediaUrl" class="relative group w-full h-full flex items-center justify-center bg-black">
                <img 
                   v-if="uploadedMediaType === 'image'"
+                  ref="imageRef"
                   :src="uploadedMediaUrl" 
                   class="preview-image opacity-80 z-0"
+                  @load="drawBoxes(detailMapByFrame[0] || [], 'image')"
                />
-               <video 
+              <video 
                   v-else-if="uploadedMediaType === 'video'"
+                  ref="localVideoRef"
                   :src="uploadedMediaUrl" 
                   class="preview-video opacity-80 z-0"
                   controls
-               ></video>
+                  @timeupdate="handleLocalVideoTimeUpdate"
+              ></video>
                
                <!-- 悬浮操作层: 非侵入式按钮定位在右上角 -->
                <div class="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-20">
@@ -131,10 +135,10 @@
         <canvas ref="boxCanvas" class="absolute inset-0 w-full h-full z-10 pointer-events-none"></canvas>
         
         <!-- Status Overlay -->
-        <div v-if="mediaType !== 'local'" class="absolute top-4 left-4 z-20 flex space-x-3">
+        <div class="absolute top-4 left-4 z-20 flex space-x-3">
           <span class="px-4 py-1.5 bg-black/60 text-white rounded-lg text-sm backdrop-blur-md border border-gray-700/50 flex items-center font-medium shadow-lg">
             <span class="w-2.5 h-2.5 rounded-full mr-2.5" :class="isAnalyzing ? 'bg-green-500 animate-pulse shadow-[0_0_8px_#22c55e]' : 'bg-red-500'"></span>
-            {{ isAnalyzing ? 'AI引擎运行中' : '引擎待机' }}
+            {{ isAnalyzing ? '分析进行中' : '引擎待机' }}
           </span>
           <span class="px-3 py-1.5 bg-black/60 text-white rounded-lg text-sm backdrop-blur-md border border-gray-700/50 font-mono">
             FPS: <span :class="isAnalyzing ? 'text-green-400' : 'text-gray-400'">{{ isAnalyzing ? '29.97' : '0.00' }}</span>
@@ -155,11 +159,11 @@
         <div class="grid grid-cols-2 gap-4 mb-6">
           <div class="bg-gradient-to-br from-blue-50 to-blue-100/50 p-4 rounded-xl border border-blue-100 shadow-sm relative overflow-hidden group">
             <div class="absolute -right-4 -top-4 w-16 h-16 bg-blue-200 rounded-full opacity-20 group-hover:scale-150 transition-transform duration-500"></div>
-            <div class="text-sm text-blue-600 font-medium mb-1">实时出勤率</div>
+            <div class="text-sm text-blue-600 font-medium mb-1">实到人数</div>
             <div class="text-3xl font-black text-blue-800 flex items-end">
-              {{ attendanceRate }}<span class="text-lg font-bold ml-1 text-blue-600">%</span>
+              {{ attendanceRate }}<span class="text-lg font-bold ml-1 text-blue-600">人</span>
             </div>
-            <div class="text-xs text-blue-500/80 mt-2 font-medium">应到 45 / 实到 {{ Math.floor(45 * attendanceRate / 100) }}</div>
+            <div class="text-xs text-blue-500/80 mt-2 font-medium">当前识别到场人数</div>
           </div>
           
           <div class="bg-gradient-to-br from-emerald-50 to-emerald-100/50 p-4 rounded-xl border border-emerald-100 shadow-sm relative overflow-hidden group">
@@ -249,12 +253,17 @@ const currentFile = ref<File | null>(null)
 const currentTaskId = ref<number | null>(null)
 const pollTimer = ref<ReturnType<typeof setInterval> | null>(null)
 
+const imageRef = ref<HTMLImageElement | null>(null)
+const localVideoRef = ref<HTMLVideoElement | null>(null)
+const detailMapByFrame = ref<Record<number, any[]>>({})
+
 const analysisResult = reactive({
   status: 0,
   progress: 0,
   attendanceCount: 0,
   totalScore: 0,
   details: [] as Array<{
+    frameTime?: number
     behaviorType: string
     count: number
     boundingBoxes?: number[][]
@@ -368,6 +377,13 @@ const handleRemoveFile = () => {
   if (uploadInput) {
     uploadInput.value = ''
   }
+  detailMapByFrame.value = {}
+
+const canvas = boxCanvas.value
+if (canvas) {
+  const ctx = canvas.getContext('2d')
+  if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height)
+}
 }
 
 const handleFileChange = (file: any) => {
@@ -507,6 +523,54 @@ const fetchTaskDetail = async (taskId: number) => {
   })
 }
 
+const normalizeDetails = (details: any[]) => {
+  if (!Array.isArray(details)) return []
+
+  return details.map((item) => {
+    const boxes = Array.isArray(item.boundingBoxes)
+      ? item.boundingBoxes.filter(
+          (box: any) => Array.isArray(box) && box.length === 4
+        )
+      : []
+
+    const rawCount = Number(item.count || 0)
+
+    // 有框时，优先以框数量为准
+    const normalizedCount = boxes.length > 0 ? boxes.length : rawCount
+
+    if (rawCount > 0 && boxes.length > 0 && rawCount !== boxes.length) {
+      console.warn('[detail mismatch] count 与 boundingBoxes 数量不一致:', {
+        behaviorType: item.behaviorType,
+        frameTime: item.frameTime,
+        count: rawCount,
+        boxCount: boxes.length,
+        item
+      })
+    }
+
+    return {
+      frameTime: Number(item.frameTime || 0),
+      behaviorType: item.behaviorType || '',
+      count: normalizedCount,
+      boundingBoxes: boxes
+    }
+  })
+}
+
+const buildDetailMapByFrame = (details: any[]) => {
+  const map: Record<number, any[]> = {}
+
+  details.forEach((item) => {
+    const frame = Number(item.frameTime || 0)
+    if (!map[frame]) {
+      map[frame] = []
+    }
+    map[frame].push(item)
+  })
+
+  detailMapByFrame.value = map
+}
+
 const startPolling = (taskId: number) => {
   stopPolling()
 
@@ -533,24 +597,34 @@ const startPolling = (taskId: number) => {
     const detailRes: any = await fetchTaskDetail(taskId)
 
     analysisResult.attendanceCount = detailRes.attendanceCount || analysisResult.attendanceCount
-    analysisResult.totalScore = detailRes.totalScore || analysisResult.totalScore
-    analysisResult.details = detailRes.details || []
+analysisResult.totalScore = detailRes.totalScore || analysisResult.totalScore
 
-    attendanceRate.value = analysisResult.attendanceCount
-    focusScore.value = analysisResult.totalScore
+const normalizedDetails = normalizeDetails(detailRes.details || [])
+analysisResult.details = normalizedDetails
 
-    // 先清零，再回填行为统计
-    Object.keys(behaviorData).forEach(k => {
-      behaviorData[k as keyof typeof behaviorData] = 0
-    })
+buildDetailMapByFrame(normalizedDetails)
 
-    analysisResult.details.forEach((item: any) => {
-      if (item.behaviorType in behaviorData) {
-        behaviorData[item.behaviorType as keyof typeof behaviorData] = item.count || 0
-      }
-    })
+attendanceRate.value = analysisResult.attendanceCount
+focusScore.value = analysisResult.totalScore
 
-    ElMessage.success('分析完成，结果已更新到页面')
+// 先清零，再回填行为统计
+Object.keys(behaviorData).forEach(k => {
+  behaviorData[k as keyof typeof behaviorData] = 0
+})
+
+normalizedDetails.forEach((item: any) => {
+  if (item.behaviorType in behaviorData) {
+    behaviorData[item.behaviorType as keyof typeof behaviorData] = item.count || 0
+  }
+})
+
+if (uploadedMediaType.value === 'image') {
+  nextTick(() => {
+    drawBoxes(detailMapByFrame.value[0] || [], 'image')
+  })
+}
+
+ElMessage.success('分析完成，结果已更新到页面')
   } catch (e) {
     console.error('拉取任务详情失败', e)
     ElMessage.warning('分析已完成，但详情加载失败')
@@ -602,14 +676,21 @@ const startAnalysis = () => {
       attendanceRate.value = data.attendanceCount || 0
       focusScore.value = data.totalScore || 0
       
-      if (data.details) {
-        Object.keys(behaviorData).forEach(k => behaviorData[k as keyof typeof behaviorData] = 0)
-        data.details.forEach((item: any) => {
-          behaviorData[item.behaviorType] = item.count || 0
-        })
-        
-        drawRealBoxes(data.details)
-      }
+     if (data.details) {
+  const normalizedDetails = normalizeDetails(data.details)
+
+  Object.keys(behaviorData).forEach(k => {
+    behaviorData[k as keyof typeof behaviorData] = 0
+  })
+
+  normalizedDetails.forEach((item: any) => {
+    if (item.behaviorType in behaviorData) {
+      behaviorData[item.behaviorType as keyof typeof behaviorData] = item.count || 0
+    }
+  })
+
+  drawBoxes(normalizedDetails, 'camera')
+}
     }
   }
   
@@ -623,6 +704,7 @@ const stopAnalysis = () => {
   stopCapture()
   stopPolling()
   currentTaskId.value = null
+  detailMapByFrame.value = {}
   
   if (wsManager) {
     wsManager.close()
@@ -677,62 +759,104 @@ const stopCapture = () => {
   }
 }
 
-const drawRealBoxes = (details: any[]) => {
+const drawBoxes = (details: any[], sourceType: 'camera' | 'image' | 'video') => {
   const canvas = boxCanvas.value
   if (!canvas) return
-  
+
+  let sourceEl: HTMLVideoElement | HTMLImageElement | null = null
+  let sourceWidth = 0
+  let sourceHeight = 0
+
+  if (sourceType === 'camera') {
+    const video = videoRef.value
+    if (!video || !video.videoWidth || !video.videoHeight) return
+    sourceEl = video
+    sourceWidth = video.videoWidth
+    sourceHeight = video.videoHeight
+  }
+
+  if (sourceType === 'image') {
+    const img = imageRef.value
+    if (!img || !img.naturalWidth || !img.naturalHeight) return
+    sourceEl = img
+    sourceWidth = img.naturalWidth
+    sourceHeight = img.naturalHeight
+  }
+
+  if (sourceType === 'video') {
+    const video = localVideoRef.value
+    if (!video || !video.videoWidth || !video.videoHeight) return
+    sourceEl = video
+    sourceWidth = video.videoWidth
+    sourceHeight = video.videoHeight
+  }
+
+  if (!sourceEl) return
+
   if (canvas.width !== canvas.offsetWidth || canvas.height !== canvas.offsetHeight) {
     canvas.width = canvas.offsetWidth
     canvas.height = canvas.offsetHeight
   }
-  
+
   const ctx = canvas.getContext('2d')
   if (!ctx) return
+
   ctx.clearRect(0, 0, canvas.width, canvas.height)
-  
-  if (mediaType.value !== 'camera') return 
-  
-  const video = videoRef.value
-  if (!video || !video.videoWidth) return
-  
-  const scaleX = canvas.width / video.videoWidth
-  const scaleY = canvas.height / video.videoHeight
-  
+
+  const canvasRect = canvas.getBoundingClientRect()
+  const mediaRect = sourceEl.getBoundingClientRect()
+
+  const scaleX = mediaRect.width / sourceWidth
+  const scaleY = mediaRect.height / sourceHeight
+
+  const offsetX = mediaRect.left - canvasRect.left
+  const offsetY = mediaRect.top - canvasRect.top
+
   details.forEach(detail => {
     const behavior = detail.behaviorType
-    // Dictionary check
     const negative = ['玩手机', '趴桌']
     const isNegative = negative.includes(behavior)
-    
+
     const color = isNegative ? '#ef4444' : '#10b981'
-    const rgbaBg = isNegative ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)'
-    
+    const rgbaBg = isNegative ? 'rgba(239, 68, 68, 0.18)' : 'rgba(16, 185, 129, 0.18)'
+
     if (detail.boundingBoxes && Array.isArray(detail.boundingBoxes)) {
       detail.boundingBoxes.forEach((box: number[]) => {
         const [x1, y1, x2, y2] = box
-        const x = x1 * scaleX
-        const y = y1 * scaleY
+
+        const x = offsetX + x1 * scaleX
+        const y = offsetY + y1 * scaleY
         const w = (x2 - x1) * scaleX
         const h = (y2 - y1) * scaleY
-        
+
         ctx.fillStyle = rgbaBg
         ctx.fillRect(x, y, w, h)
 
         ctx.strokeStyle = color
         ctx.lineWidth = 2
         ctx.strokeRect(x, y, w, h)
-        
+
         ctx.font = 'bold 13px "Microsoft YaHei", sans-serif'
         const textWidth = ctx.measureText(behavior).width
-        
+
+        const labelX = x
+        const labelY = y - 28 < 0 ? y : y - 28
+
         ctx.fillStyle = color
-        ctx.fillRect(x, y - 28, textWidth + 16, 26)
-        
+        ctx.fillRect(labelX, labelY, textWidth + 16, 26)
+
         ctx.fillStyle = '#fff'
-        ctx.fillText(behavior, x + 8, y - 9)
+        ctx.fillText(behavior, labelX + 8, labelY + 18)
       })
     }
   })
+}
+
+const handleLocalVideoTimeUpdate = () => {
+  if (!localVideoRef.value) return
+  const currentSecond = Math.floor(localVideoRef.value.currentTime || 0)
+  const details = detailMapByFrame.value[currentSecond] || []
+  drawBoxes(details, 'video')
 }
 
 const getBehaviorDotColor = (name: string) => {

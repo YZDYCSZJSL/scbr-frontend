@@ -5,21 +5,21 @@
 export class WebSocketManager {
   private ws: WebSocket | null = null;
   private url: string = '';
-  
+
   // 状态变量
   public isConnected: boolean = false;
   private isIntentionalClose: boolean = false; // 是否为主动关闭（主动释放资源不触发重连）
-  
+
   // 重连与心跳参数
   private reconnectAttempts: number = 0;
   private readonly maxReconnectAttempts: number = 5;
   private readonly heartbeatInterval: number = 30000; // 30秒发送一次 ping
   private readonly maxMissedPongs: number = 3;        // 连续 3 次没收到 pong 即视为断线
-  
+
   private missedPongCount: number = 0;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-  
+
   // 生命周期回调，暴露给业务层 / 组件层使用
   public onMessage?: (data: any) => void;
   public onConnected?: () => void;
@@ -56,7 +56,7 @@ export class WebSocketManager {
       console.warn('【WebSocket】连接已经在建立或已连接，跳过重复的 connect() 调用。');
       return;
     }
-    
+
     // 每次重新建立连接前，重置主动关闭标记
     this.isIntentionalClose = false;
     this.ws = new WebSocket(this.url);
@@ -74,7 +74,7 @@ export class WebSocketManager {
       this.isConnected = true;
       this.reconnectAttempts = 0; // 建立成功后重置重连尝试次数
       this.onConnected?.();
-      
+
       // 开启心跳任务
       this.startHeartbeat();
     };
@@ -82,7 +82,7 @@ export class WebSocketManager {
     this.ws.onmessage = (event: MessageEvent) => {
       try {
         const data = JSON.parse(event.data);
-        
+
         // 捕获心跳响应，拦截掉不抛给业务层
         if (data.type === 'pong') {
           this.missedPongCount = 0; // 收到心跳响应，清零丢失计数
@@ -174,15 +174,15 @@ export class WebSocketManager {
     }
 
     this.reconnectAttempts++;
-    
+
     // 固定的阶梯延迟：3s, 5s, 10s, 15s, 30s
     const delays = [3000, 5000, 10000, 15000, 30000];
     const delay = delays[this.reconnectAttempts - 1] || 30000;
 
     console.log(`【WebSocket】正在尝试第 ${this.reconnectAttempts} 次重连，延迟延后 ${delay} 毫秒执行...`);
-    
+
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-    
+
     this.reconnectTimer = setTimeout(() => {
       this.connect();
     }, delay);
@@ -206,21 +206,21 @@ export class WebSocketManager {
    */
   public close(): void {
     this.isIntentionalClose = true;
-    
+
     // 清除所有的定时器
     this.clearHeartbeat();
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
-    
+
     // 断开底层连接
     if (this.ws) {
       // 规范可传 code 表明是正常关闭，1000 代表 normal closure
       this.ws.close(1000, 'User intentionally closed connection.');
       this.ws = null;
     }
-    
+
     this.isConnected = false;
     console.log('【WebSocket】客户端实例已安全销毁');
   }
