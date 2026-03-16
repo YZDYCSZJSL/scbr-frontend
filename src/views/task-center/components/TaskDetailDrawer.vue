@@ -1,126 +1,147 @@
 <template>
   <el-drawer
     :model-value="modelValue"
-    title="任务详情"
+    title="分析任务诊断面板"
     size="55%"
     destroy-on-close
+    class="custom-task-drawer"
+    :header-style="{ marginBottom: '0', borderBottom: '1px solid #f3f4f6', paddingBottom: '16px', fontWeight: 'bold' }"
     @close="handleClose"
   >
     <template v-if="loading">
-      <div class="loading-wrap">
-        <el-skeleton :rows="10" animated />
+      <div class="p-6">
+        <el-skeleton :rows="8" animated />
       </div>
     </template>
 
     <template v-else>
-      <div class="task-detail-wrap">
-        <el-card shadow="never" class="detail-card">
-          <template #header>
-            <div class="card-title">基础信息</div>
-          </template>
-
-          <el-descriptions :column="2" border>
-            <el-descriptions-item label="任务编号">
-              {{ detail.id || '-' }}
-            </el-descriptions-item>
-            <el-descriptions-item label="当前状态">
-              <el-tag :type="statusTagType(detail.status)">
+      <div class="flex flex-col gap-4 p-5 bg-gray-50 min-h-full">
+        <!-- 基础信息卡片 -->
+        <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden flex-shrink-0">
+          <div class="bg-gradient-to-r from-blue-50 to-white px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+            <span class="font-bold text-gray-700 flex items-center space-x-2">
+              <el-icon class="text-blue-500"><InfoFilled /></el-icon>
+              <span>任务基础信息</span>
+            </span>
+            <el-tag :type="statusTagType(detail.status)" effect="light" class="!border-none font-bold px-3 rounded-full">
+              <div class="flex items-center gap-1.5">
+                <div class="w-2 h-2 rounded-full" :class="statusDotClass(detail.status)"></div>
                 {{ statusText(detail.status) }}
-              </el-tag>
-            </el-descriptions-item>
+              </div>
+            </el-tag>
+          </div>
+          <div class="p-4">
+            <el-descriptions :column="2" border class="task-descriptions" size="small">
+              <el-descriptions-item label="任务编号" label-class-name="w-28 bg-gray-50 text-gray-500 font-semibold">
+                <span class="font-mono font-bold text-gray-700">{{ detail.id || '-' }}</span>
+              </el-descriptions-item>
+              <el-descriptions-item label="媒体类型" label-class-name="w-28 bg-gray-50 text-gray-500 font-semibold">
+                {{ mediaTypeText(detail.mediaType) }}
+              </el-descriptions-item>
 
-            <el-descriptions-item label="课程名称">
-              {{ detail.courseName || '-' }}
-            </el-descriptions-item>
-            <el-descriptions-item label="教师姓名">
-              {{ detail.teacherName || '-' }}
-            </el-descriptions-item>
+              <el-descriptions-item label="课程名称" label-class-name="bg-gray-50 text-gray-500 font-semibold">
+                <span class="font-bold text-gray-800">{{ detail.courseName || '-' }}</span>
+              </el-descriptions-item>
+              <el-descriptions-item label="教师姓名" label-class-name="bg-gray-50 text-gray-500 font-semibold">
+                {{ detail.teacherName || '-' }}
+              </el-descriptions-item>
 
-            <el-descriptions-item label="教室名称">
-              {{ detail.classroomName || '-' }}
-            </el-descriptions-item>
-            <el-descriptions-item label="媒体类型">
-              {{ mediaTypeText(detail.mediaType) }}
-            </el-descriptions-item>
+              <el-descriptions-item label="教室名称" label-class-name="bg-gray-50 text-gray-500 font-semibold">
+                {{ detail.classroomName || '-' }}
+              </el-descriptions-item>
+              <el-descriptions-item label="文件名称" label-class-name="bg-gray-50 text-gray-500 font-semibold">
+                <span class="truncate block w-48 text-gray-600" :title="detail.fileName">{{ detail.fileName || '-' }}</span>
+              </el-descriptions-item>
 
-            <el-descriptions-item label="文件名称">
-              {{ detail.fileName || '-' }}
-            </el-descriptions-item>
-            <el-descriptions-item label="创建时间">
-              {{ detail.createdAt || '-' }}
-            </el-descriptions-item>
+              <el-descriptions-item label="时间轨迹" :span="2" label-class-name="bg-gray-50 text-gray-500 font-semibold">
+                <div class="flex items-center gap-6 text-sm text-gray-600">
+                  <div class="flex flex-col gap-0.5">
+                    <span class="text-gray-400 text-[11px] text-center">创建记录</span>
+                    <span class="font-mono font-semibold">{{ detail.createdAt || '-' }}</span>
+                  </div>
+                  <el-icon class="text-gray-300"><Right /></el-icon>
+                  <div class="flex flex-col gap-0.5">
+                    <span class="text-gray-400 text-[11px] text-center">开始分析</span>
+                    <span class="font-mono font-semibold">{{ detail.startTime || '-' }}</span>
+                  </div>
+                  <el-icon class="text-gray-300"><Right /></el-icon>
+                  <div class="flex flex-col gap-0.5">
+                    <span class="text-gray-400 text-[11px] text-center">结束时间</span>
+                    <span class="font-mono font-semibold">{{ detail.finishTime || '-' }}</span>
+                  </div>
+                </div>
+              </el-descriptions-item>
 
-            <el-descriptions-item label="开始时间">
-              {{ detail.startTime || '-' }}
-            </el-descriptions-item>
-            <el-descriptions-item label="结束时间">
-              {{ detail.finishTime || '-' }}
-            </el-descriptions-item>
+              <el-descriptions-item label="执行耗时" label-class-name="bg-gray-50 text-gray-500 font-semibold">
+                <span class="text-indigo-600 font-bold font-mono">{{ formatDuration(detail.durationSeconds) }}</span>
+              </el-descriptions-item>
+              <el-descriptions-item label="重试次数" label-class-name="bg-gray-50 text-gray-500 font-semibold">
+                {{ detail.retryCount ?? 0 }} <span class="text-gray-400 text-xs font-normal">次</span>
+              </el-descriptions-item>
 
-            <el-descriptions-item label="执行耗时">
-              {{ formatDuration(detail.durationSeconds) }}
-            </el-descriptions-item>
-            <el-descriptions-item label="重试次数">
-              {{ detail.retryCount ?? 0 }}
-            </el-descriptions-item>
-
-            <el-descriptions-item label="失败原因" :span="2">
-              <span class="fail-reason">{{ detail.failReason || '无' }}</span>
-            </el-descriptions-item>
-          </el-descriptions>
-        </el-card>
+              <el-descriptions-item v-if="Number(detail.status) === 3" label="失败原因" :span="2" label-class-name="bg-red-50 text-red-500 font-bold">
+                <div class="bg-red-50 text-red-600 p-2.5 rounded-md text-sm border border-red-100 flex items-start gap-2 shadow-sm font-mono leading-relaxed">
+                  <el-icon class="mt-0.5 shrink-0"><WarningFilled /></el-icon>
+                  <span class="whitespace-pre-wrap">{{ detail.failReason || '未知系统异常' }}</span>
+                </div>
+              </el-descriptions-item>
+            </el-descriptions>
+          </div>
+        </div>
         
-        <el-card
-          v-if="Number(detail.status) === 2"
-          shadow="never"
-          class="detail-card"
-        >
-          <template #header>
-            <div class="card-title">结果摘要</div>
-          </template>
+        <!-- 结果摘要 (仅成功时) -->
+        <div v-if="Number(detail.status) === 2" class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden flex gap-4 p-4 items-center flex-shrink-0">
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-green-400 to-emerald-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-green-500/30">
+            <el-icon :size="24"><Check /></el-icon>
+          </div>
+          <div class="flex-1 flex justify-around items-center px-4">
+            <div class="flex flex-col items-center gap-1">
+              <span class="text-gray-400 text-[11px] font-bold tracking-wider uppercase">综合评分</span>
+              <span class="text-2xl font-black text-emerald-500 font-mono">{{ detail.totalScore ?? '-' }}</span>
+            </div>
+            <div class="w-px h-10 bg-gray-100"></div>
+            <div class="flex flex-col items-center gap-1">
+              <span class="text-gray-400 text-[11px] font-bold tracking-wider uppercase">实到人数</span>
+              <span class="text-2xl font-black text-indigo-500 font-mono">{{ detail.attendanceCount ?? '-' }}</span>
+            </div>
+          </div>
+          <div class="shrink-0 pl-5 border-l border-gray-100">
+            <el-button type="success" plain class="font-bold border-green-200" @click="goToReport">
+              <el-icon class="mr-1"><DataAnalysis /></el-icon> 分析图表台账
+            </el-button>
+          </div>
+        </div>
 
-          <el-descriptions :column="2" border>
-            <el-descriptions-item label="综合评分">
-              {{ detail.totalScore ?? '-' }}
-            </el-descriptions-item>
-            <el-descriptions-item label="实到人数">
-              {{ detail.attendanceCount ?? '-' }}
-            </el-descriptions-item>
-          </el-descriptions>
-        </el-card>
-
-        <el-card shadow="never" class="detail-card">
-          <template #header>
-            <div class="card-title">任务日志</div>
-          </template>
-
-          <TaskLogTimeline :logs="logs" />
-        </el-card>
+        <!-- 任务日志卡片 -->
+        <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">
+          <div class="bg-gray-50 px-5 py-3 border-b border-gray-100 flex items-center justify-between shrink-0">
+            <span class="font-bold text-gray-700 flex items-center space-x-2">
+              <el-icon class="text-indigo-500"><Document /></el-icon>
+              <span>节点执行轨迹</span>
+            </span>
+          </div>
+          <div class="p-5 overflow-y-auto flex-1 bg-slate-50/30">
+            <TaskLogTimeline :logs="logs" />
+          </div>
+        </div>
       </div>
     </template>
 
-   <template #footer>
-  <div class="drawer-footer">
-    <el-button @click="handleClose">关闭</el-button>
+    <template #footer>
+      <div class="px-5 py-3 border-t border-gray-100 flex justify-end gap-3 bg-white">
+        <el-button class="font-bold px-6 text-gray-600 hover:text-gray-800 hover:bg-gray-100" @click="handleClose">关闭面板</el-button>
 
-    <el-button
-      v-if="Number(detail.status) === 2"
-      type="success"
-      @click="goToReport"
-    >
-      查看报表
-    </el-button>
-
-    <el-button
-      v-if="Number(detail.status) === 3"
-      type="primary"
-      :loading="retryLoading"
-      @click="handleRetry"
-    >
-      重新分析
-    </el-button>
-  </div>
-</template>
+        <el-button
+          v-if="Number(detail.status) === 3"
+          type="primary"
+          :loading="retryLoading"
+          class="font-bold px-6 shadow-md shadow-blue-500/30"
+          @click="handleRetry"
+        >
+          <el-icon class="mr-1"><RefreshRight /></el-icon>重新启动分析
+        </el-button>
+      </div>
+    </template>
   </el-drawer>
 </template>
 
@@ -128,6 +149,7 @@
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { InfoFilled, Right, WarningFilled, Check, DataAnalysis, Document, RefreshRight } from '@element-plus/icons-vue'
 import TaskLogTimeline from './TaskLogTimeline.vue'
 import { getTaskCenterDetail, getTaskCenterLogs, retryTask } from '../api'
 
@@ -228,6 +250,16 @@ function statusTagType(status) {
   return map[status] || 'info'
 }
 
+function statusDotClass(status) {
+  const map = {
+    0: 'bg-gray-400',
+    1: 'bg-orange-400',
+    2: 'bg-green-500',
+    3: 'bg-red-500'
+  }
+  return map[status] || 'bg-gray-400'
+}
+
 function mediaTypeText(type) {
   const map = {
     1: '图片',
@@ -258,32 +290,15 @@ function goToReport() {
 </script>
 
 <style scoped>
-.task-detail-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+/* Scoped element plus overrides strictly for the drawer */
+.custom-task-drawer :deep(.el-drawer__body) {
+  padding: 0 !important;
 }
-
-.detail-card {
-  border-radius: 8px;
+.custom-task-drawer :deep(.el-drawer__header) {
+  margin-bottom: 0px !important;
+  color: #1e293b;
 }
-
-.card-title {
-  font-weight: 600;
-  color: #303133;
-}
-
-.loading-wrap {
-  padding: 8px;
-}
-
-.drawer-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-}
-
-.fail-reason {
-  color: #f56c6c;
+.task-descriptions :deep(.el-descriptions__content) {
+  color: #334155;
 }
 </style>

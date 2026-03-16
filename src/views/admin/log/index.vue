@@ -1,60 +1,54 @@
 <template>
-  <div class="log-center-page">
-    <el-alert
+  <div class="flex flex-col h-full gap-4">
+    <!-- <el-alert
       title="本页面用于查看系统登录日志、操作日志和任务执行日志，仅管理员可访问。"
       type="info"
       :closable="false"
       show-icon
-      class="page-tip"
-    />
+      class="shrink-0 bg-blue-50 text-blue-800 border-blue-100"
+    /> -->
 
-    <el-card shadow="never" class="log-card">
-      <template #header>
-        <div class="page-header">
-          <span>日志中心</span>
-        </div>
-      </template>
+    <!-- 顶栏 (类似参考图样式) -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex items-center gap-4 shrink-0">
+      <div class="w-12 h-12 rounded-xl bg-gray-50 text-gray-600 flex items-center justify-center shrink-0">
+        <el-icon :size="24"><Memo /></el-icon>
+      </div>
+      <div class="flex flex-col">
+        <span class="text-[17px] font-bold text-gray-800 tracking-wide">日志中心</span>
+        <span class="text-[12px] text-gray-400 mt-1">查看系统登录、操作和任务执行日志</span>
+      </div>
+    </div>
 
-      <el-tabs v-model="activeTab" @tab-change="handleTabChange">
+    <div class="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col p-4">
+      <el-tabs v-model="activeTab" class="flex-1 flex flex-col" @tab-change="handleTabChange">
         <!-- 登录日志 -->
-        <el-tab-pane label="登录日志" name="login">
-          <div class="search-bar">
-            <el-form :inline="true" :model="loginQuery">
-              <el-form-item label="工号">
-                <el-input v-model="loginQuery.empNo" placeholder="请输入工号" clearable style="width: 180px" />
-              </el-form-item>
-              <el-form-item label="用户名">
-                <el-input v-model="loginQuery.userName" placeholder="请输入用户名" clearable style="width: 180px" />
-              </el-form-item>
-              <el-form-item label="登录状态">
-                <el-select v-model="loginQuery.loginStatus" placeholder="请选择" clearable style="width: 160px">
-                  <el-option label="成功" :value="1" />
-                  <el-option label="失败" :value="0" />
-                </el-select>
-              </el-form-item>
-              <el-form-item label="时间范围">
-                <el-date-picker
-                  v-model="loginDateRange"
-                  type="daterange"
-                  range-separator="至"
-                  start-placeholder="开始日期"
-                  end-placeholder="结束日期"
-                  value-format="YYYY-MM-DD"
-                />
-              </el-form-item>
-              <el-form-item>
-                <el-button type="primary" @click="fetchLoginLogs">查询</el-button>
-                <el-button @click="resetLoginQuery">重置</el-button>
-              </el-form-item>
-            </el-form>
+        <el-tab-pane label="登录日志" name="login" class="h-full flex flex-col">
+          <div class="flex flex-wrap items-center gap-3 mb-4 shrink-0">
+            <el-input v-model="loginQuery.empNo" placeholder="工号" clearable class="w-40" />
+            <el-input v-model="loginQuery.userName" placeholder="用户名" clearable class="w-40" />
+            <el-select v-model="loginQuery.loginStatus" placeholder="登录状态" clearable class="w-32">
+              <el-option label="成功" :value="1" />
+              <el-option label="失败" :value="0" />
+            </el-select>
+            <el-date-picker
+              v-model="loginDateRange"
+              type="daterange"
+              range-separator="-"
+              start-placeholder="开始日期"
+              end-placeholder="结束日期"
+              value-format="YYYY-MM-DD"
+              class="!w-[240px]"
+            />
+            <el-button type="primary" color="#409eff" class="px-5 font-medium ml-1" @click="fetchLoginLogs">查询</el-button>
+            <el-button class="px-4 font-medium" plain @click="resetLoginQuery">重置</el-button>
           </div>
 
-          <el-table v-loading="loginLoading" :data="loginTableData" border stripe>
+          <el-table v-loading="loginLoading" :data="loginTableData" stripe class="flex-1" height="100%">
             <el-table-column prop="empNo" label="工号" min-width="120" />
             <el-table-column prop="userName" label="用户名" min-width="120" />
             <el-table-column label="登录状态" min-width="100">
               <template #default="{ row }">
-                <el-tag :type="Number(row.loginStatus) === 1 ? 'success' : 'danger'">
+                <el-tag :type="Number(row.loginStatus) === 1 ? 'success' : 'danger'" size="small">
                   {{ Number(row.loginStatus) === 1 ? '成功' : '失败' }}
                 </el-tag>
               </template>
@@ -65,10 +59,11 @@
             <el-table-column prop="createdAt" label="登录时间" min-width="180" />
           </el-table>
 
-          <div class="pagination-wrap">
+          <div class="mt-4 flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100 shrink-0">
+            <div class="text-sm text-gray-500 font-medium ml-2">检索结果：<span class="text-blue-600 font-bold mx-1">{{ loginTotal }}</span>条数据</div>
             <el-pagination
               background
-              layout="total, sizes, prev, pager, next, jumper"
+              layout="sizes, prev, pager, next, jumper"
               :total="loginTotal"
               :current-page="loginQuery.page"
               :page-size="loginQuery.size"
@@ -80,54 +75,41 @@
         </el-tab-pane>
 
         <!-- 操作日志 -->
-        <el-tab-pane label="操作日志" name="operation">
-          <div class="search-bar">
-            <el-form :inline="true" :model="operationQuery">
-              <el-form-item label="工号">
-                <el-input v-model="operationQuery.empNo" placeholder="请输入工号" clearable style="width: 180px" />
-              </el-form-item>
-              <el-form-item label="模块名称">
-                <el-input v-model="operationQuery.moduleName" placeholder="请输入模块名称" clearable style="width: 180px" />
-              </el-form-item>
-              <el-form-item label="操作类型">
-                <el-select
-                  v-model="operationQuery.operationType"
-                  placeholder="请选择操作类型"
-                  clearable
-                  style="width: 180px"
-                >
-                  <el-option
-                    v-for="item in operationTypeOptions"
-                    :key="item.value"
-                    :label="item.label"
-                    :value="item.value"
-                  />
-                </el-select>
-              </el-form-item>
-              <el-form-item label="操作状态">
-                <el-select v-model="operationQuery.operationStatus" placeholder="请选择" clearable style="width: 160px">
-                  <el-option label="成功" :value="1" />
-                  <el-option label="失败" :value="0" />
-                </el-select>
-              </el-form-item>
-              <el-form-item label="时间范围">
-                <el-date-picker
-                  v-model="operationDateRange"
-                  type="daterange"
-                  range-separator="至"
-                  start-placeholder="开始日期"
-                  end-placeholder="结束日期"
-                  value-format="YYYY-MM-DD"
-                />
-              </el-form-item>
-              <el-form-item>
-                <el-button type="primary" @click="fetchOperationLogs">查询</el-button>
-                <el-button @click="resetOperationQuery">重置</el-button>
-              </el-form-item>
-            </el-form>
+        <el-tab-pane label="操作日志" name="operation" class="h-full flex flex-col">
+          <div class="flex flex-wrap items-center gap-3 mb-4 shrink-0">
+            <el-input v-model="operationQuery.empNo" placeholder="工号" clearable class="w-32" />
+            <el-input v-model="operationQuery.moduleName" placeholder="模块名称" clearable class="w-36" />
+            <el-select
+              v-model="operationQuery.operationType"
+              placeholder="操作类型"
+              clearable
+              class="w-40"
+            >
+              <el-option
+                v-for="item in operationTypeOptions"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+              />
+            </el-select>
+            <el-select v-model="operationQuery.operationStatus" placeholder="操作状态" clearable class="w-32">
+              <el-option label="成功" :value="1" />
+              <el-option label="失败" :value="0" />
+            </el-select>
+            <el-date-picker
+              v-model="operationDateRange"
+              type="daterange"
+              range-separator="-"
+              start-placeholder="开始日期"
+              end-placeholder="结束日期"
+              value-format="YYYY-MM-DD"
+              class="!w-[240px]"
+            />
+            <el-button type="primary" color="#409eff" class="px-5 font-medium ml-1" @click="fetchOperationLogs">查询</el-button>
+            <el-button class="px-4 font-medium" plain @click="resetOperationQuery">重置</el-button>
           </div>
 
-          <el-table v-loading="operationLoading" :data="operationTableData" border stripe>
+          <el-table v-loading="operationLoading" :data="operationTableData" stripe class="flex-1" height="100%">
             <el-table-column prop="empNo" label="工号" min-width="120" />
             <el-table-column prop="userName" label="操作人" min-width="120" />
             <el-table-column prop="moduleName" label="模块名称" min-width="140" />
@@ -140,7 +122,7 @@
             <el-table-column prop="operationDesc" label="操作说明" min-width="220" show-overflow-tooltip />
             <el-table-column label="操作状态" min-width="100">
               <template #default="{ row }">
-                <el-tag :type="Number(row.operationStatus) === 1 ? 'success' : 'danger'">
+                <el-tag :type="Number(row.operationStatus) === 1 ? 'success' : 'danger'" size="small">
                   {{ Number(row.operationStatus) === 1 ? '成功' : '失败' }}
                 </el-tag>
               </template>
@@ -150,10 +132,11 @@
             <el-table-column prop="createdAt" label="操作时间" min-width="180" />
           </el-table>
 
-          <div class="pagination-wrap">
+          <div class="mt-4 flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100 shrink-0">
+            <div class="text-sm text-gray-500 font-medium ml-2">检索结果：<span class="text-blue-600 font-bold mx-1">{{ operationTotal }}</span>条数据</div>
             <el-pagination
               background
-              layout="total, sizes, prev, pager, next, jumper"
+              layout="sizes, prev, pager, next, jumper"
               :total="operationTotal"
               :current-page="operationQuery.page"
               :page-size="operationQuery.size"
@@ -165,51 +148,40 @@
         </el-tab-pane>
 
         <!-- 任务日志 -->
-        <el-tab-pane label="任务日志" name="task">
-          <div class="search-bar">
-            <el-form :inline="true" :model="taskQuery">
-              <el-form-item label="任务ID">
-                <el-input v-model="taskQuery.taskId" placeholder="请输入任务ID" clearable style="width: 180px" />
-              </el-form-item>
-              <el-form-item label="阶段">
-                <el-select
-                  v-model="taskQuery.stage"
-                  placeholder="请选择阶段"
-                  clearable
-                  style="width: 180px"
-                >
-                  <el-option
-                    v-for="item in taskStageOptions"
-                    :key="item.value"
-                    :label="item.label"
-                    :value="item.value"
-                  />
-                </el-select>
-              </el-form-item>
-              <el-form-item label="状态">
-                <el-select v-model="taskQuery.status" placeholder="请选择" clearable style="width: 160px">
-                  <el-option label="成功" :value="1" />
-                  <el-option label="失败" :value="0" />
-                </el-select>
-              </el-form-item>
-              <el-form-item label="时间范围">
-                <el-date-picker
-                  v-model="taskDateRange"
-                  type="daterange"
-                  range-separator="至"
-                  start-placeholder="开始日期"
-                  end-placeholder="结束日期"
-                  value-format="YYYY-MM-DD"
-                />
-              </el-form-item>
-              <el-form-item>
-                <el-button type="primary" @click="fetchTaskLogs">查询</el-button>
-                <el-button @click="resetTaskQuery">重置</el-button>
-              </el-form-item>
-            </el-form>
+        <el-tab-pane label="任务日志" name="task" class="h-full flex flex-col">
+          <div class="flex flex-wrap items-center gap-3 mb-4 shrink-0">
+            <el-input v-model="taskQuery.taskId" placeholder="任务ID" clearable class="w-40" />
+            <el-select
+              v-model="taskQuery.stage"
+              placeholder="阶段"
+              clearable
+              class="w-40"
+            >
+              <el-option
+                v-for="item in taskStageOptions"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+              />
+            </el-select>
+            <el-select v-model="taskQuery.status" placeholder="状态" clearable class="w-32">
+              <el-option label="成功" :value="1" />
+              <el-option label="失败" :value="0" />
+            </el-select>
+            <el-date-picker
+              v-model="taskDateRange"
+              type="daterange"
+              range-separator="-"
+              start-placeholder="开始日期"
+              end-placeholder="结束日期"
+              value-format="YYYY-MM-DD"
+              class="!w-[240px]"
+            />
+            <el-button type="primary" color="#409eff" class="px-5 font-medium ml-1" @click="fetchTaskLogs">查询</el-button>
+            <el-button class="px-4 font-medium" plain @click="resetTaskQuery">重置</el-button>
           </div>
 
-          <el-table v-loading="taskLoading" :data="taskTableData" border stripe>
+          <el-table v-loading="taskLoading" :data="taskTableData" stripe class="flex-1" height="100%">
             <el-table-column prop="taskId" label="任务ID" min-width="100" />
             <el-table-column label="阶段" min-width="140">
               <template #default="{ row }">
@@ -218,7 +190,7 @@
             </el-table-column>
             <el-table-column label="状态" min-width="100">
               <template #default="{ row }">
-                <el-tag :type="Number(row.status) === 1 ? 'success' : 'danger'">
+                <el-tag :type="Number(row.status) === 1 ? 'success' : 'danger'" size="small">
                   {{ Number(row.status) === 1 ? '成功' : '失败' }}
                 </el-tag>
               </template>
@@ -232,10 +204,11 @@
             <el-table-column prop="createdAt" label="记录时间" min-width="180" />
           </el-table>
 
-          <div class="pagination-wrap">
+          <div class="mt-4 flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100 shrink-0">
+            <div class="text-sm text-gray-500 font-medium ml-2">检索结果：<span class="text-blue-600 font-bold mx-1">{{ taskTotal }}</span>条数据</div>
             <el-pagination
               background
-              layout="total, sizes, prev, pager, next, jumper"
+              layout="sizes, prev, pager, next, jumper"
               :total="taskTotal"
               :current-page="taskQuery.page"
               :page-size="taskQuery.size"
@@ -246,13 +219,14 @@
           </div>
         </el-tab-pane>
       </el-tabs>
-    </el-card>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Memo } from '@element-plus/icons-vue'
 import {
   getLoginLogPage,
   getOperationLogPage,
@@ -592,30 +566,9 @@ function handleTaskSizeChange(size) {
 </script>
 
 <style scoped>
-.log-center-page {
-  padding: 16px;
-}
-
-.page-tip {
-  margin-bottom: 16px;
-}
-
-.log-card {
-  border-radius: 10px;
-}
-
-.page-header {
-  font-weight: 600;
-  color: #303133;
-}
-
-.search-bar {
-  margin-bottom: 16px;
-}
-
-.pagination-wrap {
-  margin-top: 16px;
+:deep(.el-tabs__content) {
+  flex-grow: 1;
   display: flex;
-  justify-content: flex-end;
+  flex-direction: column;
 }
 </style>

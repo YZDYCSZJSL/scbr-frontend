@@ -1,166 +1,199 @@
 <template>
-  <div class="task-center-page">
-    <el-alert
-      title="本页面用于查看分析任务的执行状态、失败原因、执行日志与重试；课堂结果请到“课堂分析报告”中查看。"
-      type="info"
-      :closable="false"
-      show-icon
-      class="page-tip"
-    />
-    <el-card shadow="never" class="search-card">
-      <el-form :inline="true" :model="queryForm" class="search-form">
-        <el-form-item label="关键词">
-          <el-input
-            v-model="queryForm.keyword"
-            placeholder="请输入课程/教师/教室关键词"
-            clearable
-            style="width: 220px"
-            @keyup.enter="handleSearch"
-          />
-        </el-form-item>
-
-        <el-form-item label="任务状态">
-          <el-select
-            v-model="queryForm.status"
-            placeholder="请选择状态"
-            clearable
-            style="width: 160px"
-          >
-            <el-option label="排队中" :value="0" />
-            <el-option label="分析中" :value="1" />
-            <el-option label="分析成功" :value="2" />
-            <el-option label="分析失败" :value="3" />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item label="媒体类型">
-          <el-select
-            v-model="queryForm.mediaType"
-            placeholder="请选择媒体类型"
-            clearable
-            style="width: 160px"
-          >
-            <el-option label="图片" :value="1" />
-            <el-option label="视频" :value="2" />
-            <el-option label="实时流" :value="3" />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item label="创建时间">
-          <el-date-picker
-            v-model="dateRange"
-            type="daterange"
-            start-placeholder="开始日期"
-            end-placeholder="结束日期"
-            range-separator="至"
-            value-format="YYYY-MM-DD"
-          />
-        </el-form-item>
-
-        <el-form-item>
-          <el-button type="primary" @click="handleSearch">查询</el-button>
-          <el-button @click="handleReset">重置</el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
-
-    <el-card shadow="never" class="table-card">
-      <template #header>
-        <div class="table-header">
-          <span>分析任务列表(任务执行管理)</span>
-          <el-button @click="fetchList">刷新</el-button>
+  <div class="flex flex-col h-full gap-4">
+    <!-- 顶栏 (类似参考图样式) -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex justify-between items-center gap-4 shrink-0 overflow-x-auto whitespace-nowrap">
+      <!-- 左侧：图标与标题 -->
+      <div class="flex items-center gap-4 shrink-0">
+        <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-500 flex items-center justify-center shrink-0">
+          <el-icon :size="24"><Monitor /></el-icon>
         </div>
-      </template>
+        <div class="flex flex-col">
+          <span class="text-[17px] font-bold text-gray-800 tracking-wide">任务中心</span>
+          <span class="text-[12px] text-gray-400 mt-1">管理及查看任务执行信息</span>
+        </div>
+      </div>
+
+      <!-- 右侧：无标签内联搜索区 -->
+      <div class="flex items-center gap-3 shrink-0">
+        <el-input
+          v-model="queryForm.keyword"
+          placeholder="搜索课程 / 教师"
+          clearable
+          class="w-40"
+          @keyup.enter="handleSearch"
+        >
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
+
+        <el-select
+          v-model="queryForm.status"
+          placeholder="任务状态"
+          clearable
+          class="w-28"
+        >
+          <el-option label="排队中" :value="0" />
+          <el-option label="分析中" :value="1" />
+          <el-option label="分析成功" :value="2" />
+          <el-option label="分析失败" :value="3" />
+        </el-select>
+
+        <el-select
+          v-model="queryForm.mediaType"
+          placeholder="媒体类型"
+          clearable
+          class="w-28"
+        >
+          <el-option label="图片" :value="1" />
+          <el-option label="视频" :value="2" />
+          <el-option label="实时流" :value="3" />
+        </el-select>
+
+        <el-date-picker
+          v-model="dateRange"
+          type="daterange"
+          start-placeholder="开始日期"
+          end-placeholder="结束日期"
+          range-separator="-"
+          value-format="YYYY-MM-DD"
+          class="!w-[230px]"
+        />
+
+        <el-button type="primary" color="#409eff" class="px-5 font-medium ml-1" @click="handleSearch">
+          <el-icon class="mr-1"><Search /></el-icon>查询
+        </el-button>
+        <el-button class="px-4 font-medium" plain @click="handleReset">
+          重置
+        </el-button>
+      </div>
+    </div>
+
+    <!-- 数据表格 -->
+    <div class="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
+      <!-- 列表标题与工具栏 -->
+      <div class="flex justify-between items-center bg-gray-50/50 px-4 py-3 border-b border-gray-100 shrink-0">
+        <div class="flex items-center space-x-2">
+          <div class="w-1 h-4 bg-blue-500 rounded-full"></div>
+          <span class="font-bold text-gray-700">分析任务执行台账</span>
+        </div>
+        <el-button plain size="small" @click="fetchList" class="text-gray-600 hover:text-blue-600">
+          <el-icon class="mr-1"><RefreshRight /></el-icon>刷新状态
+        </el-button>
+      </div>
 
       <el-table
         v-loading="loading"
         :data="tableData"
-        border
-        stripe
         style="width: 100%"
+        height="100%"
+        stripe
+        :header-cell-style="{ background: '#f8fafc', color: '#475569', fontWeight: 'bold' }"
       >
-        <el-table-column prop="id" label="任务编号" min-width="90" />
-        <el-table-column prop="courseName" label="课程名称" min-width="160" />
-        <el-table-column prop="teacherName" label="教师姓名" min-width="120" />
-        <el-table-column prop="classroomName" label="教室名称" min-width="120" />
-
-        <el-table-column label="媒体类型" min-width="100">
+        <el-table-column prop="id" label="编号" width="80" align="center" />
+        <el-table-column prop="courseName" label="课程名称" min-width="150" show-overflow-tooltip>
           <template #default="{ row }">
-            {{ mediaTypeText(row.mediaType) }}
+            <span class="font-medium text-gray-800">{{ row.courseName || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="教师" min-width="120">
+          <template #default="{ row }">
+            <div class="flex items-center space-x-2">
+              <el-avatar :size="24" class="bg-indigo-100 text-indigo-700 text-xs shrink-0">
+                {{ (row.teacherName || '无').charAt(0) }}
+              </el-avatar>
+              <span class="truncate">{{ row.teacherName || '-' }}</span>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="classroomName" label="教室" min-width="120" show-overflow-tooltip />
+
+        <el-table-column label="媒体类型" width="90" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.mediaType === 1" type="info" effect="light" class="!border-none bg-gray-100" size="small">图片</el-tag>
+            <el-tag v-else-if="row.mediaType === 2" type="primary" effect="light" class="!border-none bg-blue-50 text-blue-600" size="small">视频</el-tag>
+            <el-tag v-else-if="row.mediaType === 3" type="warning" effect="light" class="!border-none bg-orange-50 text-orange-600" size="small">实时流</el-tag>
+            <span v-else class="text-gray-400">-</span>
           </template>
         </el-table-column>
 
-        <el-table-column label="任务状态" min-width="100">
+        <el-table-column label="任务状态" width="100" align="center">
           <template #default="{ row }">
-            <el-tag :type="statusTagType(row.status)">
+            <el-tag :type="statusTagType(row.status)" effect="light" class="!border-none font-bold w-16 text-center" size="small">
               {{ statusText(row.status) }}
             </el-tag>
           </template>
         </el-table-column>
 
-
-
-        <el-table-column prop="retryCount" label="重试次数" min-width="90" />
-
-        <el-table-column label="失败原因" min-width="180" show-overflow-tooltip>
+        <el-table-column label="失败原因" min-width="160" show-overflow-tooltip>
           <template #default="{ row }">
-            <span class="fail-reason-text">{{ formatFailReason(row.failReason) }}</span>
+            <span v-if="row.status === 3" class="text-red-500 font-medium text-sm flex items-center gap-1">
+              <el-icon><Warning /></el-icon> {{ formatFailReason(row.failReason) || '未知异常' }}
+            </span>
+            <span v-else class="text-gray-400">-</span>
           </template>
         </el-table-column>
 
-        <el-table-column label="执行耗时" min-width="100">
+        <el-table-column label="耗时" width="90" align="center">
           <template #default="{ row }">
-            {{ formatDuration(row.durationSeconds) }}
+            <span class="text-gray-600 font-mono text-sm">{{ formatDuration(row.durationSeconds) }}</span>
           </template>
         </el-table-column>
 
-
-        <el-table-column prop="createdAt" label="创建时间" min-width="170" />
-        <el-table-column prop="startTime" label="开始时间" min-width="170" />
-        <el-table-column prop="finishTime" label="结束时间" min-width="170" />
-
-     
-
-        <el-table-column label="操作" fixed="right" min-width="220">
+        <el-table-column prop="createdAt" label="发现时间" width="160" align="center">
           <template #default="{ row }">
-            <el-button type="primary" link @click="openDetail(row)">
-              详情
-            </el-button>
+            <span class="text-gray-500 text-sm font-mono">{{ row.createdAt || '-' }}</span>
+          </template>
+        </el-table-column>
 
-            <el-button
-              v-if="Number(row.status) === 2"
-              type="success"
-              link
-              @click="goToReport(row)"
-            >
-              查看报表
-            </el-button>
+        <el-table-column label="操作" fixed="right" width="220" align="center">
+          <template #default="{ row }">
+            <div class="flex items-center justify-center gap-3">
+              <el-button type="primary" link size="small" class="!m-0 font-medium hover:text-blue-700" @click="openDetail(row)">
+                <el-icon class="mr-1"><View /></el-icon> 详情日志
+              </el-button>
 
-            <el-button
-              v-if="Number(row.status) === 3"
-              type="danger"
-              link
-              @click="handleRetry(row)"
-            >
-              重试
-            </el-button>
+              <el-button
+                v-if="Number(row.status) === 2"
+                type="success"
+                link
+                size="small"
+                class="!m-0 font-medium hover:text-green-700"
+                @click="goToReport(row)"
+              >
+                <el-icon class="mr-1"><DataAnalysis /></el-icon> 查看报表
+              </el-button>
+
+              <el-button
+                v-if="Number(row.status) === 3"
+                type="danger"
+                link
+                size="small"
+                class="!m-0 font-medium hover:text-red-700"
+                @click="handleRetry(row)"
+              >
+                <el-icon class="mr-1"><RefreshRight /></el-icon> 重试
+              </el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
+    </div>
 
-      <div class="pagination-wrap">
-        <el-pagination
-          background
-          layout="total, sizes, prev, pager, next, jumper"
-          :total="total"
-          :current-page="queryForm.page"
-          :page-size="queryForm.size"
-          :page-sizes="[10, 20, 50, 100]"
-          @current-change="handlePageChange"
-          @size-change="handleSizeChange"
-        />
-      </div>
-    </el-card>
+    <!-- 分页器 -->
+    <div class="mt-4 flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100 shrink-0">
+      <div class="text-sm text-gray-500 font-medium ml-2">总任务数：<span class="text-gray-900 font-bold">{{ total }}</span></div>
+      <el-pagination
+        background
+        layout="sizes, prev, pager, next, jumper"
+        :total="total"
+        v-model:current-page="queryForm.page"
+        v-model:page-size="queryForm.size"
+        :page-sizes="[10, 20, 50, 100]"
+        @current-change="handlePageChange"
+        @size-change="handleSizeChange"
+      />
+    </div>
 
     <TaskDetailDrawer
       v-model="detailVisible"
@@ -174,6 +207,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Search, Refresh, RefreshRight, View, DataAnalysis, Warning, Monitor } from '@element-plus/icons-vue'
 import TaskDetailDrawer from './components/TaskDetailDrawer.vue'
 import { getTaskCenterPage, retryTask } from './api'
 
@@ -366,42 +400,14 @@ function formatFailReason(reason) {
 
   return text
 }
-
 </script>
 
 <style scoped>
-.task-center-page {
-  padding: 16px;
+/* Scoped overrides to ensure clean rendering. Most styling is via Tailwind. */
+:deep(.el-table__row) {
+  transition: all 0.2s ease;
 }
-
-.search-card,
-.table-card {
-  border-radius: 10px;
-  margin-bottom: 16px;
-}
-
-.search-form {
-  display: flex;
-  flex-wrap: wrap;
-}
-
-.table-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.pagination-wrap {
-  margin-top: 16px;
-  display: flex;
-  justify-content: flex-end;
-}
-
-.fail-reason-text {
-  color: #f56c6c;
-}
-
-.page-tip {
-  margin-bottom: 16px;
+:deep(.el-table__row:hover) {
+  background-color: #f1f5f9 !important;
 }
 </style>

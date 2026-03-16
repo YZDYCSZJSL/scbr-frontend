@@ -7,7 +7,7 @@
         <!-- Schedule Selector -->
         <el-select 
           v-model="selectedClass" 
-          placeholder="请选择要分析的课程" 
+          placeholder="请选择要分析的排课" 
           popper-class="!rounded-xl shadow-lg"
           class="w-80"
         >
@@ -21,10 +21,17 @@
             :value="item.id || item.scheduleId"
             class="!h-auto !py-2"
           >
-            <div class="flex flex-col leading-tight">
-              <span class="font-bold text-gray-800 text-sm mb-1 truncate">{{ item.courseName }} - {{ item.classroomName }} - 讲师：{{ item.teacherName }}</span>
-              <span class="text-xs text-gray-400">时间：{{ item.startTime }} 至 {{ item.endTime }}</span>
-            </div>
+          <div class="flex flex-col leading-tight">
+            <span class="font-bold text-gray-800 text-sm mb-1 truncate">
+              {{ item.courseName }} - {{ item.classroomName }} - 讲师：{{ item.teacherName }}
+            </span>
+            <span class="text-xs text-gray-400">
+              {{ formatWeekday(item.weekday) }} · 第{{ item.startSectionNo }}-{{ item.endSectionNo }}节
+            </span>
+            <span class="text-xs text-gray-400">
+              {{ item.startSectionTime }} ~ {{ item.endSectionTime }} · {{ item.startWeek }}-{{ item.endWeek }}周 / {{ formatWeekType(item.weekType) }}
+            </span>
+          </div>
           </el-option>
         </el-select>
         
@@ -62,7 +69,13 @@
         </el-button>
       </div>
     </div>
-
+    <el-alert
+      v-if="scheduleAnalysisInit"
+      :title="`已带入排课：${scheduleAnalysisInit.courseName} / ${scheduleAnalysisInit.classroomName} / ${scheduleAnalysisInit.weekdayName} / ${scheduleAnalysisInit.sectionRangeText}`"
+      type="success"
+      :closable="false"
+      show-icon
+    />
     <!-- Main Content Grid -->
     <div class="flex-1 flex space-x-4 overflow-hidden min-h-[600px]">
       
@@ -222,22 +235,71 @@ import { Camera, VideoCamera, VideoPlay, VideoPause, DataAnalysis, UploadFilled,
 import request from '@/utils/request'
 import { useUserStore } from '@/store/user'
 import { WebSocketManager } from '@/utils/WebSocketManager'
+import { useRoute } from 'vue-router'
+
 
 // --- TypeScript Definitions ---
 export interface ScheduleAnalysisVO {
-  id: number; // 后端实际返回的是 id
-  scheduleId?: number; // 兼容可能存在的旧格式
-  courseId: number;
-  courseName: string;
-  classroomId: number;
-  classroomName: string;
-  teacherId: number;
-  teacherName: string;
-  startTime: string; // "YYYY-MM-DD HH:mm:ss"
-  endTime: string;
-  status: number;
+  id: number
+  scheduleId?: number
+
+  courseId: number
+  courseName: string
+
+  classroomId: number
+  classroomName: string
+
+  teacherId: number
+  teacherName: string
+
+  academicYear: string
+  semester: number
+  weekday: number
+
+  startSectionNo: number
+  endSectionNo: number
+  startSectionTime: string
+  endSectionTime: string
+
+  startWeek: number
+  endWeek: number
+  weekType: number
+
+  studentCount: number
+  status?: number
 }
+
+export interface ScheduleAnalysisInitVO {
+  scheduleId: number
+  academicYear: string
+  semester: number
+  courseId: number
+  courseName: string
+  teacherId: number
+  teacherName: string
+  classroomId: number
+  classroomName: string
+  weekday: number
+  weekdayName: string
+  startSectionId: number
+  startSectionNo: number
+  endSectionId: number
+  endSectionNo: number
+  sectionRangeText: string
+  sectionTimeText: string
+  startWeek: number
+  endWeek: number
+  weekType: number
+  weekTypeName: string
+  weekRangeText: string
+  studentCount: number
+  remark: string
+}
+
 // --- // TypeScript Definitions ---
+const route = useRoute()
+const prefillApplied = ref(false)
+const scheduleAnalysisInit = ref<ScheduleAnalysisInitVO | null>(null)
 
 const selectedClass = ref<number | null>(null)
 const mediaType = ref<'camera' | 'local'>('local')
@@ -313,10 +375,39 @@ const stopCamera = () => {
   }
 }
 
+const readScheduleAnalysisInit = (): ScheduleAnalysisInitVO | null => {
+  try {
+    const raw = sessionStorage.getItem('scheduleAnalysisInit')
+    if (!raw) return null
+    return JSON.parse(raw)
+  } catch (error) {
+    console.error('解析 scheduleAnalysisInit 失败', error)
+    return null
+  }
+}
+
+const applySchedulePrefill = () => {
+  if (prefillApplied.value) return
+  if (route.query.prefill !== '1') return
+
+  const init = readScheduleAnalysisInit()
+  if (!init || !init.scheduleId) return
+
+  scheduleAnalysisInit.value = init
+
+  const matched = scheduleOptions.value.find(
+    item => Number(item.id || item.scheduleId) === Number(init.scheduleId)
+  )
+
+  if (matched) {
+    selectedClass.value = Number(matched.id || matched.scheduleId)
+    prefillApplied.value = true
+    ElMessage.success('已自动带入排课信息，请继续上传文件或启动实时分析')
+  }
+}
+
 // 拉取排课数据的请求函数
 const fetchScheduleList = async () => {
-  // 1. 切换时清空当前选中项
-  selectedClass.value = null
   
   try {
     const streamType = mediaType.value === 'camera' ? 1 : 2
@@ -331,6 +422,7 @@ const fetchScheduleList = async () => {
     // and `.items` if using other common frameworks. Check multiple possible layers:
     const dataList = response?.records || response?.data || response
     scheduleOptions.value = Array.isArray(dataList) ? dataList : []
+    applySchedulePrefill()
   } catch (error) {
     console.error('获取排课列表失败', error)
     scheduleOptions.value = []
@@ -339,23 +431,22 @@ const fetchScheduleList = async () => {
 
 // 监听媒体类型切换
 watch(mediaType, async (newVal) => {
-  fetchScheduleList()
+  await fetchScheduleList()
+
   if (newVal === 'camera') {
-    // 切换到实时流时，清理之前上传的文件流，释放内存
     if (uploadedMediaUrl.value) {
       handleRemoveFile()
     }
-    // 等待 DOM 更新渲染出 video 后再调用摄像头
     await nextTick()
     startCamera()
   } else {
-    // 切换离开时关闭摄像头彻底释放资源
     stopCamera()
   }
 })
 
-onMounted(() => {
-  fetchScheduleList()
+onMounted(async () => {
+  await fetchScheduleList()
+  applySchedulePrefill()
 })
 
 const handleRemoveFile = () => {
@@ -857,6 +948,28 @@ const handleLocalVideoTimeUpdate = () => {
   const currentSecond = Math.floor(localVideoRef.value.currentTime || 0)
   const details = detailMapByFrame.value[currentSecond] || []
   drawBoxes(details, 'video')
+}
+
+const formatWeekday = (weekday: number) => {
+  const map: Record<number, string> = {
+    1: '周一',
+    2: '周二',
+    3: '周三',
+    4: '周四',
+    5: '周五',
+    6: '周六',
+    7: '周日'
+  }
+  return map[weekday] || '-'
+}
+
+const formatWeekType = (weekType: number) => {
+  const map: Record<number, string> = {
+    0: '全周',
+    1: '单周',
+    2: '双周'
+  }
+  return map[weekType] || '-'
 }
 
 const getBehaviorDotColor = (name: string) => {

@@ -1,7 +1,7 @@
 <template>
   <el-dialog
     v-model="visible"
-    title="课程分析报告详情"
+    title="课堂分析报告详情"
     width="1000px"
     top="6vh"
     @closed="handleClose"
@@ -12,13 +12,11 @@
     <div v-loading="loading" class="flex flex-col gap-4 text-gray-800" style="height: 65vh; min-height: 500px;">
       <el-alert
         title="此处展示课堂分析结果，包括评分、人数统计、行为趋势与抓拍信息；任务执行状态与失败重试请前往分析任务中心查看。"
-        type="success"
+        type="info"
         :closable="false"
         show-icon
-        class="detail-tip"
+        class="shrink-0 bg-blue-50 text-blue-800 border-blue-100"
       />
-
-
       <!--========================================
         1. 顶部：公共战报看板 
         固定展示得分、应到实到人数及基础属性

@@ -1,47 +1,59 @@
 <template>
   <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col h-full">
-    <el-alert
+    <!-- <el-alert
       title="本页面用于查看已分析完成的课堂结果、评分、行为统计与导出，不展示任务执行日志与失败重试。"
       type="success"
       :closable="false"
       show-icon
       class="page-tip shrink-0 mb-4"
-    />
-    <!-- 顶栏搜索 -->
-    <div class="flex items-center justify-between mb-6 shrink-0">
-      <div class="flex items-center space-x-3">
-        <div class="p-2 bg-blue-50 text-blue-600 rounded-lg">
-          <el-icon :size="20"><Document /></el-icon>
+    /> -->
+    <!-- 顶栏 (类似参考图样式) -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex flex-wrap justify-between items-center gap-4 shrink-0 mb-4">
+      <!-- 左侧：图标与标题 -->
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 rounded-xl bg-green-50 text-green-600 flex items-center justify-center shrink-0">
+          <el-icon :size="24"><Document /></el-icon>
         </div>
-        <h2 class="text-xl font-bold text-gray-800">课堂分析报告</h2>
+        <div class="flex flex-col">
+          <span class="text-[17px] font-bold text-gray-800 tracking-wide">课堂分析报告</span>
+          <span class="text-[12px] text-gray-400 mt-1">查看课堂结果及数据导出</span>
+        </div>
       </div>
-      <div class="flex space-x-3">
-        <el-input 
-          v-model="searchQuery.keyword" 
-          placeholder="搜索课程名称或教师" 
-          class="w-64 !h-10"
+
+      <!-- 右侧：无标签内联搜索区 -->
+      <div class="flex flex-wrap items-center gap-3">
+        <el-input
+          v-model="searchQuery.keyword"
+          placeholder="搜索课程名称或教师"
+          clearable
+          class="w-56"
+          @keyup.enter="fetchData"
         >
           <template #prefix>
             <el-icon><Search /></el-icon>
           </template>
         </el-input>
+
         <el-date-picker
           v-model="searchQuery.dateRange"
           type="daterange"
-          range-separator="至"
+          range-separator="-"
           start-placeholder="开始日期"
           end-placeholder="结束日期"
-          class="!w-72 !h-10"
+          class="!w-[240px]"
         />
-        <el-button type="primary" class="!h-10 px-6 font-medium" @click="fetchData">查询</el-button>
-        <el-button 
-          plain 
-          class="!h-10 px-5 text-gray-600" 
-          :disabled="selectedRows.length === 0"
+
+        <el-button type="primary" color="#409eff" class="px-5 font-medium ml-1" @click="fetchData">
+          <el-icon class="mr-1"><Search /></el-icon>查询
+        </el-button>
+
+        <el-button
+          color="#67c23a"
+          type="success"
+          class="px-5 font-medium"
           @click="handleBatchExport"
         >
-          <el-icon class="mr-1"><Download /></el-icon>
-          批量导出{{ selectedRows.length > 0 ? `${selectedRows.length}条记录`: '' }}
+          <el-icon class="mr-1"><Download /></el-icon>批量导出{{ selectedRows.length > 0 ? `(${selectedRows.length})` : '' }}
         </el-button>
       </div>
     </div>
@@ -104,12 +116,14 @@
 
         <el-table-column label="操作" fixed="right" width="160" align="center">
           <template #default="scope">
-            <el-button @click="showDetail(scope.row)" link type="primary" size="small" class="font-medium hover:text-blue-700">
-              <el-icon class="mr-1"><DataLine /></el-icon>详情
-            </el-button>
-            <el-button @click="handleExport(scope.row)" link type="success" size="small" class="font-medium hover:text-green-700">
-              <el-icon class="mr-1"><Download /></el-icon>导出
-            </el-button>
+            <div class="flex items-center justify-center gap-3">
+              <el-button @click="showDetail(scope.row)" link type="primary" size="small" class="!m-0 font-medium hover:text-blue-700">
+                <el-icon class="mr-1"><DataLine /></el-icon>详情
+              </el-button>
+              <el-button @click="handleExport(scope.row)" link type="success" size="small" class="!m-0 font-medium hover:text-green-700">
+                <el-icon class="mr-1"><Download /></el-icon>导出
+              </el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -239,7 +253,10 @@ const handleSelectionChange = (rows) => {
 }
 
 const handleBatchExport = async () => {
-  if (selectedRows.value.length === 0) return
+  if (selectedRows.value.length === 0) {
+    ElMessage.warning('请先在左侧勾选需要导出的单次记录')
+    return
+  }
   ElMessage.info('开始批量导出，请稍后...')
   try {
     const ids = selectedRows.value.map(r => r.id)
