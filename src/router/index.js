@@ -76,6 +76,12 @@ const routes = [
                 name: 'SystemConfig',
                 component: () => import('@/views/admin/config/index.vue'),
                 meta: { title: '系统参数', icon: 'Operation', roles: [1] } // 仅超级管理员可见
+            },
+            {
+                path: 'log',
+                name: 'LogCenter',
+                component: () => import('@/views/admin/log/index.vue'),
+                meta: { title: '日志中心', icon: 'Tickets', roles: [1] }
             }
         ]
     },
