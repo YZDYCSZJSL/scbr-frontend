@@ -1,7 +1,7 @@
 <template>
   <el-dialog
     v-model="visible"
-    title="课程历史分析任务详情"
+    title="课程分析报告详情"
     width="1000px"
     top="6vh"
     @closed="handleClose"
@@ -10,7 +10,15 @@
   >
     <!-- 全局高度限制与 Flex 布局撑开内部 -->
     <div v-loading="loading" class="flex flex-col gap-4 text-gray-800" style="height: 65vh; min-height: 500px;">
-      
+      <el-alert
+        title="此处展示课堂分析结果，包括评分、人数统计、行为趋势与抓拍信息；任务执行状态与失败重试请前往分析任务中心查看。"
+        type="success"
+        :closable="false"
+        show-icon
+        class="detail-tip"
+      />
+
+
       <!--========================================
         1. 顶部：公共战报看板 
         固定展示得分、应到实到人数及基础属性
@@ -75,12 +83,9 @@
         <div class="flex-1 flex justify-end relative z-10 min-w-0">
           <div class="shrink-0 flex items-center gap-4 bg-gradient-to-r from-gray-50 to-gray-100 px-4 py-2 rounded-xl border border-gray-200">
             <div class="flex flex-col text-right">
-              <span class="text-xs font-extrabold text-gray-700 mb-1">班级AI综合评分</span>
+              <span class="text-xs font-extrabold text-gray-700 mb-1">课堂分析综合评分</span>
               <div class="flex items-center gap-1 justify-end">
-                <span class="text-[10px] font-bold text-gray-400 scale-90">STATUS</span>
-                <el-tag :type="getStatusType(taskData.status)" size="small" effect="dark" round class="border-0 shadow-sm leading-none font-bold">
-                  {{ getStatusName(taskData.status) }}
-                </el-tag>
+                <span class="text-[11px] font-semibold text-gray-400">结果视图</span>
               </div>
             </div>
             
@@ -114,10 +119,10 @@
           :taskData="taskData" 
         />
         
-        <div v-else class="w-full h-full flex flex-col items-center justify-center text-gray-400 bg-white rounded-xl border border-gray-200 shadow-sm">
+       <div v-else class="w-full h-full flex flex-col items-center justify-center text-gray-400 bg-white rounded-xl border border-gray-200 shadow-sm">
           <el-icon :size="64" class="mb-4 text-gray-300"><WarningFilled /></el-icon>
-          <span class="text-xl font-bold text-gray-500">此任务无媒体类型，或仍在排队解析中</span>
-          <p class="text-sm mt-2">只有当分析状态达到「分析完成」并且具备正确的媒体格式方可预览详情</p>
+          <span class="text-xl font-bold text-gray-500">当前暂无可展示的课堂分析结果</span>
+          <p class="text-sm mt-2">如需查看任务执行状态、失败原因或重新分析，请前往分析任务中心。</p>
         </div>
       </div>
     </div>
@@ -234,8 +239,6 @@ const open = async (row) => {
   }
 }
 
-defineExpose({ open })
-
 const handleClose = () => {
   // 重置状态
  taskData.id = ''
@@ -252,6 +255,13 @@ const handleClose = () => {
   taskData.detailList = []
 }
 
+const close = () => {
+  visible.value = false
+  // 不要在此强制调用 handleClose()，交由 @closed 自然触发即可，以防动画闪烁和重复清空
+}
+
+defineExpose({ open, close })
+
 const handleDownloadReport = async () => {
   if (!taskData.id) return
   ElMessage.info('正在导出本报告...')
@@ -265,15 +275,7 @@ const handleDownloadReport = async () => {
 }
 
 /* ================= 工具方法 ================= */
-const getStatusName = (status) => {
-  const map = { 0: '排队中', 1: '解析中', 2: '分析完成', 3: '异常中止' }
-  return map[status] || '未知'
-}
 
-const getStatusType = (status) => {
-  const map = { 0: 'info', 1: 'warning', 2: 'success', 3: 'danger' }
-  return map[status] || 'info'
-}
 
 const getScoreColor = (score) => {
   if (score >= 80) return 'text-emerald-500'
@@ -300,6 +302,12 @@ const getStarCount = (score) => {
 </script>
 
 <style scoped>
+
+
+.detail-tip {
+  margin-bottom: 4px;
+}
+
 /* 自定义超长弹窗体无内边距，靠内部元素撑开间隙，提升科技感与美观度 */
 .custom-report-dialog :deep(.el-dialog__body) {
   padding: 20px;

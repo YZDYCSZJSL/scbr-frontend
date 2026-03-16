@@ -28,10 +28,16 @@ const routes = [
                 meta: { title: '数据看板', icon: 'DataAnalysis' } // 加载到侧边栏显示，图标可自选
             },
             {
+                path: 'task-center',
+                name: 'TaskCenter',
+                component: () => import('@/views/task-center/index.vue'),
+                meta: { title: '分析任务中心', icon: 'List' }
+            },
+            {
                 path: 'history',
                 name: 'History',
                 component: () => import('@/views/history/index.vue'),
-                meta: { title: '我的报表', icon: 'DataLine' }
+                meta: { title: '课堂分析报告', icon: 'DataLine' }
             },
             // 基础数据/管理员专属菜单
             {

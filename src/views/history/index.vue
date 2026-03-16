@@ -1,12 +1,19 @@
 <template>
   <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col h-full">
+    <el-alert
+      title="本页面用于查看已分析完成的课堂结果、评分、行为统计与导出，不展示任务执行日志与失败重试。"
+      type="success"
+      :closable="false"
+      show-icon
+      class="page-tip shrink-0 mb-4"
+    />
     <!-- 顶栏搜索 -->
-    <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center justify-between mb-6 shrink-0">
       <div class="flex items-center space-x-3">
         <div class="p-2 bg-blue-50 text-blue-600 rounded-lg">
           <el-icon :size="20"><Document /></el-icon>
         </div>
-        <h2 class="text-xl font-bold text-gray-800">历史任务报表</h2>
+        <h2 class="text-xl font-bold text-gray-800">课堂分析报告</h2>
       </div>
       <div class="flex space-x-3">
         <el-input 
@@ -56,8 +63,8 @@
         <el-table-column label="教师" width="140">
           <template #default="{ row }">
             <div class="flex items-center space-x-2">
-              <el-avatar :size="24" class="bg-indigo-100 text-indigo-700 text-xs">{{ row.teacherName.charAt(0) }}</el-avatar>
-              <span>{{ row.teacherName }}</span>
+              <el-avatar :size="24" class="bg-indigo-100 text-indigo-700 text-xs">{{ (row.teacherName || '无').charAt(0) }}</el-avatar>
+              <span>{{ row.teacherName || '-' }}</span>
             </div>
           </template>
         </el-table-column>
@@ -69,15 +76,6 @@
           </template>
         </el-table-column>
         <el-table-column prop="createdAt" label="创建时间" width="180" />
-        
-        <el-table-column label="分析状态" width="120" align="center">
-          <template #default="scope">
-            <el-tag v-if="scope.row.status === 0" type="info" effect="light" class="!border-none" round>排队中</el-tag>
-            <el-tag v-else-if="scope.row.status === 1" type="warning" effect="light" class="!border-none" round>分析中</el-tag>
-            <el-tag v-else-if="scope.row.status === 2" type="success" effect="light" class="!border-none" round>分析成功</el-tag>
-            <el-tag v-else-if="scope.row.status === 3" type="danger" effect="light" class="!border-none" round>分析失败</el-tag>
-          </template>
-        </el-table-column>
 
         <el-table-column label="综合得分" width="140" align="center">
           <template #default="{ row }">
@@ -96,6 +94,14 @@
           </template>
         </el-table-column>
 
+        <el-table-column label="实到人数" width="110" align="center">
+          <template #default="{ row }">
+            <span class="font-semibold text-slate-700">
+              {{ row.attendanceCount ?? '-' }}
+            </span>
+          </template>
+        </el-table-column>
+
         <el-table-column label="操作" fixed="right" width="160" align="center">
           <template #default="scope">
             <el-button @click="showDetail(scope.row)" link type="primary" size="small" class="font-medium hover:text-blue-700">
@@ -110,7 +116,7 @@
     </div>
 
     <!-- 分页器 -->
-    <div class="mt-5 flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100">
+    <div class="mt-5 flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100 shrink-0">
       <div class="text-sm text-gray-500 font-medium ml-2">总记录数：<span class="text-gray-900 font-bold">{{ total }}</span></div>
       <el-pagination
         v-model:current-page="searchQuery.page"
@@ -124,16 +130,22 @@
       />
     </div>
     <!-- 详情弹窗 -->
-    <TaskDetail ref="taskDetailRef" />
+    <TaskDetail  ref="taskDetailRef"/>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, nextTick } from 'vue'
 import { Search, Download, Document, DataLine, TopRight, BottomRight } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import TaskDetail from './components/TaskDetail.vue'
 import { getReportPage, exportReportToExcel } from './api/index'
+import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
+
+
+const route = useRoute()  
+const router = useRouter()
+const hasAutoOpened = ref(false)
 
 const loading = ref(false)
 const tableData = ref([])
@@ -175,8 +187,29 @@ const fetchData = async () => {
     
     const res = await getReportPage(params)
     // request.js 响应拦截器已经返回了 res.data
-    tableData.value = res.records || []
-    total.value = res.total || 0
+    const rawList = res.records || []
+    tableData.value = rawList.filter(item => Number(item.status) === 2)
+    total.value = tableData.value.length
+
+    await nextTick()
+
+    const targetTaskId = route.query.taskId
+    if (targetTaskId && !hasAutoOpened.value) {
+      const targetRow = tableData.value.find(
+        item => String(item.id) === String(targetTaskId)
+      )
+      if (targetRow) {
+        showDetail(targetRow)
+        hasAutoOpened.value = true
+
+        // 更安全的清理路由方式，且保证只执行一次
+        const newQuery = { ...route.query }
+        if (newQuery.taskId) {
+          delete newQuery.taskId
+          router.replace({ query: newQuery })
+        }
+      }
+    }
   } catch (error) {
     console.error(error)
     ElMessage.error('请求异常')
@@ -189,10 +222,16 @@ onMounted(() => {
   fetchData()
 })
 
-const showDetail = (row) => {
-  if (taskDetailRef.value) {
-    taskDetailRef.value.open(row)
+onBeforeRouteLeave(() => {
+  if (taskDetailRef.value && taskDetailRef.value.close) {
+    taskDetailRef.value.close()
   }
+})
+
+const showDetail = (row) => {
+   if (taskDetailRef.value) {
+     taskDetailRef.value.open(row)
+   }
 }
 
 const handleSelectionChange = (rows) => {
@@ -223,3 +262,7 @@ const handleExport = async (row) => {
   }
 }
 </script>
+
+
+<style scoped>
+</style>
