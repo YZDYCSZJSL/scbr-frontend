@@ -26,7 +26,7 @@ export function exportReportToExcel(ids) {
     // 3. 完善下载逻辑：防坑设计（如果后端实际业务报错，Spring 会用 JSON 替代流，这时候拿到的是 type 为 json 的 Blob）
     if (res.type === 'application/json') {
       const reader = new FileReader()
-      reader.onload = function() {
+      reader.onload = function () {
         const errorData = JSON.parse(reader.result)
         console.error('导出异常:', errorData.message)
       }
@@ -40,14 +40,14 @@ export function exportReportToExcel(ids) {
     const link = document.createElement('a')
     link.style.display = 'none'
     link.href = downloadUrl
-    
+
     // 生成带时间戳的文件名防止重复覆盖
     const fileName = `课堂分析报表_${new Date().getTime()}.xlsx`
     link.setAttribute('download', fileName)
-    
+
     document.body.appendChild(link)
     link.click()
-    
+
     // 完成后立马卸磨杀驴，不留垃圾防内存泄漏
     document.body.removeChild(link)
     window.URL.revokeObjectURL(downloadUrl)
@@ -62,5 +62,49 @@ export function getReportDetail(id) {
   return request({
     url: `/report/${id}/detail`,
     method: 'get'
+  })
+}
+
+/**
+ * 课堂评估报告详情接口
+ * @param {string|number} taskId - 任务ID
+ */
+export function getReportEvaluation(taskId) {
+  return request({
+    url: `/report/${taskId}/evaluation`,
+    method: 'get'
+  })
+}
+
+/**
+ * 课堂评估趋势数据接口
+ * @param {string|number} taskId - 任务ID
+ */
+export function getReportTrend(taskId) {
+  return request({
+    url: `/report/${taskId}/trend`,
+    method: 'get'
+  })
+}
+
+/**
+ * 课堂异常抓拍数据接口
+ * @param {string|number} taskId - 任务ID
+ */
+export function getReportAbnormalSnapshots(taskId) {
+  return request({
+    url: `/report/${taskId}/abnormal-snapshots`,
+    method: 'get'
+  })
+}
+
+/**
+ * 手动生成课堂评估报告
+ * @param {string|number} taskId - 任务ID
+ */
+export function generateReport(taskId) {
+  return request({
+    url: `/report/${taskId}/generate`,
+    method: 'post'
   })
 }

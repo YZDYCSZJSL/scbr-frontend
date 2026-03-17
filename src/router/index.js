@@ -39,6 +39,12 @@ const routes = [
                 component: () => import('@/views/history/index.vue'),
                 meta: { title: '课堂分析报告', icon: 'DataLine' }
             },
+            {
+                path: 'history/:taskId',
+                name: 'HistoryDetail',
+                component: () => import('@/views/history/detail.vue'),
+                meta: { hidden: true }
+            },
             // 基础数据/管理员专属菜单
             {
                 path: 'data',

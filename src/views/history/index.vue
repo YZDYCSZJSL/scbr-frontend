@@ -87,7 +87,7 @@
             <el-tag v-else-if="row.mediaType === 3" type="warning" effect="light" class="!border-none" size="small">实时流</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="createdAt" label="创建时间" width="180" />
+        <el-table-column prop="createdAt" label="分析时间" width="180" />
 
         <el-table-column label="综合得分" width="140" align="center">
           <template #default="{ row }">
@@ -113,12 +113,64 @@
             </span>
           </template>
         </el-table-column>
+        <el-table-column label="出勤率" width="110" align="center">
+          <template #default="{ row }">
+            <span class="font-semibold text-slate-700">
+              {{ row.attendanceRate != null ? `${row.attendanceRate}%` : '-' }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="评估等级" width="110" align="center">
+          <template #default="{ row }">
+            <el-tag
+              v-if="row.reportLevel"
+              :type="
+                row.reportLevel === '优秀'
+                  ? 'success'
+                  : row.reportLevel === '良好'
+                    ? 'primary'
+                    : row.reportLevel === '一般'
+                      ? 'warning'
+                      : 'danger'
+              "
+              effect="light"
+              class="!border-none"
+              size="small"
+            >
+              {{ row.reportLevel }}
+            </el-tag>
+            <span v-else class="text-gray-400">-</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="异常标记" width="110" align="center">
+          <template #default="{ row }">
+            <el-tag
+              v-if="Number(row.abnormalFlag) === 1"
+              type="danger"
+              effect="light"
+              class="!border-none"
+              size="small"
+            >
+              有异常
+            </el-tag>
+            <el-tag
+              v-else
+              type="success"
+              effect="light"
+              class="!border-none"
+              size="small"
+            >
+              正常
+            </el-tag>
+          </template>
+        </el-table-column>
 
         <el-table-column label="操作" fixed="right" width="160" align="center">
           <template #default="scope">
             <div class="flex items-center justify-center gap-3">
               <el-button @click="showDetail(scope.row)" link type="primary" size="small" class="!m-0 font-medium hover:text-blue-700">
-                <el-icon class="mr-1"><DataLine /></el-icon>详情
+                <el-icon class="mr-1"><DataLine /></el-icon>查看报告
               </el-button>
               <el-button @click="handleExport(scope.row)" link type="success" size="small" class="!m-0 font-medium hover:text-green-700">
                 <el-icon class="mr-1"><Download /></el-icon>导出
@@ -143,28 +195,22 @@
         @current-change="fetchData"
       />
     </div>
-    <!-- 详情弹窗 -->
-    <TaskDetail  ref="taskDetailRef"/>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, nextTick } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { Search, Download, Document, DataLine, TopRight, BottomRight } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import TaskDetail from './components/TaskDetail.vue'
 import { getReportPage, exportReportToExcel } from './api/index'
-import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
+import { useRouter } from 'vue-router'
 
 
-const route = useRoute()  
 const router = useRouter()
-const hasAutoOpened = ref(false)
 
 const loading = ref(false)
 const tableData = ref([])
 const total = ref(0)
-const taskDetailRef = ref(null)
 const selectedRows = ref([])
 
 const searchQuery = reactive({
@@ -205,25 +251,6 @@ const fetchData = async () => {
     tableData.value = rawList.filter(item => Number(item.status) === 2)
     total.value = tableData.value.length
 
-    await nextTick()
-
-    const targetTaskId = route.query.taskId
-    if (targetTaskId && !hasAutoOpened.value) {
-      const targetRow = tableData.value.find(
-        item => String(item.id) === String(targetTaskId)
-      )
-      if (targetRow) {
-        showDetail(targetRow)
-        hasAutoOpened.value = true
-
-        // 更安全的清理路由方式，且保证只执行一次
-        const newQuery = { ...route.query }
-        if (newQuery.taskId) {
-          delete newQuery.taskId
-          router.replace({ query: newQuery })
-        }
-      }
-    }
   } catch (error) {
     console.error(error)
     ElMessage.error('请求异常')
@@ -236,16 +263,12 @@ onMounted(() => {
   fetchData()
 })
 
-onBeforeRouteLeave(() => {
-  if (taskDetailRef.value && taskDetailRef.value.close) {
-    taskDetailRef.value.close()
-  }
-})
 
 const showDetail = (row) => {
-   if (taskDetailRef.value) {
-     taskDetailRef.value.open(row)
-   }
+  router.push({
+    name: 'HistoryDetail',
+    params: { taskId: row.id }
+  })
 }
 
 const handleSelectionChange = (rows) => {
