@@ -1,17 +1,23 @@
 <template>
-  <div class="data-dashboard-container">
+  <div class="data-dashboard-container" v-loading="loading">
     <!-- 模块 1: 核心 KPI 卡片 -->
     <el-row :gutter="20" class="mb-4 kpi-row">
-      <el-col :span="8" v-for="(kpi, index) in kpiData" :key="index">
-        <el-card shadow="hover" class="kpi-card h-full">
-          <div class="kpi-content flex flex-col justify-between h-full">
-            <div class="kpi-label text-gray-500 text-base mb-2">{{ kpi.label }}</div>
-            <div class="kpi-value-area flex items-baseline mt-2">
-              <span class="kpi-value text-3xl font-bold text-gray-800">{{ kpi.value }}</span>
-              <span class="kpi-unit text-sm text-gray-400 ml-1" v-if="kpi.unit">{{ kpi.unit }}</span>
-            </div>
+      <el-col
+        :xs="24"
+        :sm="12"
+        :lg="6"
+        v-for="(kpi, index) in kpiData"
+        :key="index"
+      >
+      <el-card shadow="hover" class="kpi-card h-full">
+        <div class="kpi-content flex flex-col justify-between h-full">
+          <div class="kpi-label text-gray-500 text-base mb-2">{{ kpi.label }}</div>
+          <div class="kpi-value-area flex items-baseline mt-2">
+            <span class="kpi-value text-3xl font-bold text-gray-800">{{ kpi.value }}</span>
+            <span class="kpi-unit text-sm text-gray-400 ml-1" v-if="kpi.unit">{{ kpi.unit }}</span>
           </div>
-        </el-card>
+        </div>
+      </el-card>
       </el-col>
     </el-row>
 
@@ -76,9 +82,9 @@ const dashboardData = ref({
     department: ''
   },
   kpi: [],
-  pieTitle: '各行为占比画像',
+  pieTitle: '课堂行为占比画像',
   pie: [],
-  barTitle: '',
+  barTitle: '课程综合评分排行',
   bar: [],
   lineTitle: '近七日课堂平均专注度趋势',
   lineDates: [],
@@ -87,7 +93,17 @@ const dashboardData = ref({
 
 const loading = ref(false)
 
-const kpiData = computed(() => dashboardData.value.kpi || [])
+const kpiData = computed(() => {
+  const list = dashboardData.value.kpi || []
+  if (Array.isArray(list) && list.length > 0) return list
+
+  return [
+    { label: '平均课堂综合评分', value: 0, unit: '分' },
+    { label: '平均出勤率', value: 0, unit: '%' },
+    { label: '平均专注度', value: 0, unit: '分' },
+    { label: '异常课堂占比', value: 0, unit: '%' }
+  ]
+})
 
 // ============================================
 // 二、ECharts DOM / 实例
@@ -142,33 +158,33 @@ const fetchDashboardData = async () => {
   try {
     const res = await getDashboardOverview({ days: 7 })
 
-    dashboardData.value = {
-      role: res.role ?? 0,
-      userInfo: res.userInfo || {
-        empNo: '',
-        name: '',
-        role: 0,
-        department: ''
-      },
-      kpi: (res.kpi || []).map(item => ({
-        label: item.label || '',
-        value: Number(item.value ?? 0),
-        unit: item.unit || ''
-      })),
-      pieTitle: res.pieTitle || '各行为占比画像',
-      pie: (res.pie || []).map(item => ({
-        name: item.name || '-',
-        value: Number(item.value ?? 0)
-      })),
-      barTitle: res.barTitle || '',
-      bar: (res.bar || []).map(item => ({
-        name: item.name || '-',
-        value: Number(item.value ?? 0)
-      })),
-      lineTitle: res.lineTitle || '近七日课堂平均专注度趋势',
-      lineDates: res.lineDates || [],
-      lineValues: (res.lineValues || []).map(v => Number(v ?? 0))
-    }
+  dashboardData.value = {
+  role: res.role ?? 0,
+  userInfo: res.userInfo || {
+    empNo: '',
+    name: '',
+    role: 0,
+    department: ''
+    },
+    kpi: (res.kpi || []).map(item => ({
+      label: item.label || '',
+      value: Number(item.value ?? 0),
+      unit: item.unit || ''
+    })),
+    pieTitle: res.pieTitle || '课堂行为占比画像',
+    pie: (res.pie || []).map(item => ({
+      name: item.name || '-',
+      value: Number(item.value ?? 0)
+    })),
+    barTitle: res.barTitle || '课程综合评分排行',
+    bar: (res.bar || []).map(item => ({
+      name: item.name || '-',
+      value: Number(item.value ?? 0)
+    })),
+    lineTitle: res.lineTitle || '近七日课堂平均专注度趋势',
+    lineDates: res.lineDates || [],
+    lineValues: (res.lineValues || []).map(v => Number(v ?? 0))
+  }
 
     nextTick(() => {
       renderCharts()
@@ -288,7 +304,7 @@ const renderCharts = () => {
       },
       series: [
         {
-          name: '专注度分数',
+          name: '课堂综合评分',
           type: 'bar',
           barWidth: 20,
           itemStyle: {
@@ -343,7 +359,7 @@ const renderCharts = () => {
       },
       series: [
         {
-          name: '平均得分',
+          name: '平均专注度',
           type: 'line',
           smooth: true,
           symbolSize: 6,
@@ -387,6 +403,11 @@ onUnmounted(() => {
   Object.values(chartInstances).forEach(ins => {
     if (ins) ins.dispose()
   })
+  chartInstances = {
+    pie: null,
+    bar: null,
+    line: null
+  }
 })
 </script>
 

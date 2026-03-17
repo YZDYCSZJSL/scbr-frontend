@@ -42,6 +42,60 @@
       />
       
     </div>
+
+    <div
+  v-if="reportSummary.visible && mediaType === 'local'"
+  class="bg-white rounded-xl border border-gray-100 shadow-sm p-5"
+>
+  <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
+    <div>
+      <div class="text-sm text-gray-500 mb-1">本次课堂评估摘要</div>
+      <h3 class="text-lg font-semibold text-gray-900">分析已完成，可查看完整课堂评估报告</h3>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <el-tag
+        :type="
+          reportSummary.reportLevel === '优秀'
+            ? 'success'
+            : reportSummary.reportLevel === '良好'
+              ? 'primary'
+              : reportSummary.reportLevel === '一般'
+                ? 'warning'
+                : 'danger'
+        "
+        effect="light"
+      >
+        {{ reportSummary.reportLevel || '未评级' }}
+      </el-tag>
+
+      <el-button type="primary" @click="goToReportDetail">
+        查看完整报告
+      </el-button>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+    <div class="rounded-xl bg-gray-50 border border-gray-100 p-4">
+      <div class="text-sm text-gray-500 mb-2">综合评分</div>
+      <div class="text-3xl font-bold text-gray-900">{{ reportSummary.totalScore || 0 }}</div>
+    </div>
+
+    <div class="rounded-xl bg-gray-50 border border-gray-100 p-4">
+      <div class="text-sm text-gray-500 mb-2">实到人数</div>
+      <div class="text-3xl font-bold text-gray-900">{{ reportSummary.attendanceCount || 0 }}</div>
+    </div>
+
+    <div class="rounded-xl bg-gray-50 border border-gray-100 p-4">
+      <div class="text-sm text-gray-500 mb-2">出勤率</div>
+      <div class="text-3xl font-bold text-gray-900">{{ reportSummary.attendanceRateText }}</div>
+    </div>
+  </div>
+
+  <div class="rounded-xl bg-blue-50 border border-blue-100 px-4 py-4 text-sm text-gray-700 leading-7">
+    {{ reportSummary.summaryText }}
+  </div>
+</div>
   </div>
 </template>
 
@@ -50,7 +104,7 @@ import { ref, onMounted, onUnmounted, reactive, watch, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/store/user'
 import { WebSocketManager } from '@/utils/WebSocketManager'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import TopControlBar from './components/TopControlBar.vue'
 import MediaDisplay from './components/MediaDisplay.vue'
@@ -60,6 +114,7 @@ import { fetchScheduleListApi, submitAnalysisTaskApi, fetchTaskStatusApi, fetchT
 import type { ScheduleAnalysisVO, ScheduleAnalysisInitVO } from './api'
 
 const route = useRoute()
+const router = useRouter()
 const userStore = useUserStore()
 
 const prefillApplied = ref(false)
@@ -91,6 +146,15 @@ const analysisResult = reactive({
     count: number
     boundingBoxes?: number[][]
   }>
+})
+
+const reportSummary = reactive({
+  visible: false,
+  attendanceRateText: '-',
+  reportLevel: '',
+  summaryText: '',
+  totalScore: 0,
+  attendanceCount: 0
 })
 
 let wsManager: WebSocketManager | null = null
@@ -206,6 +270,8 @@ const handleRemoveFile = () => {
   if (uploadInput) uploadInput.value = ''
   
   detailMapByFrame.value = {}
+  currentTaskId.value = null
+  resetReportSummary()
 
   const canvas = mediaDisplayRef.value?.boxCanvas
   if (canvas) {
@@ -252,6 +318,51 @@ const behaviorData = reactive({
   '举手回答问题': 0, '阅读': 0, '趴桌': 0, '起立回答问题': 0, '玩手机': 0, '书写': 0, '正常听课': 0
 })
 
+
+const resetReportSummary = () => {
+  reportSummary.visible = false
+  reportSummary.attendanceRateText = '-'
+  reportSummary.reportLevel = ''
+  reportSummary.summaryText = ''
+  reportSummary.totalScore = 0
+  reportSummary.attendanceCount = 0
+}
+
+const getReportLevel = (score: number) => {
+  if (score >= 90) return '优秀'
+  if (score >= 80) return '良好'
+  if (score >= 70) return '一般'
+  return '需关注'
+}
+
+const getAttendanceRateText = (attendanceCount: number) => {
+  const matched = scheduleOptions.value.find(
+    item => Number(item.id || item.scheduleId) === Number(selectedClass.value)
+  )
+  const expectedCount = Number((matched as any)?.studentCount || 0)
+  if (!expectedCount) return '-'
+  return `${((attendanceCount / expectedCount) * 100).toFixed(1)}%`
+}
+
+const buildSummaryText = (score: number) => {
+  if (score >= 90) return '本次课堂整体表现优秀，课堂秩序与专注度表现较好。'
+  if (score >= 80) return '本次课堂整体表现良好，但仍有进一步优化空间。'
+  if (score >= 70) return '本次课堂整体表现一般，建议关注课堂中段的行为波动。'
+  return '本次课堂需重点关注，建议结合异常行为结果进一步分析。'
+}
+
+const goToReportDetail = () => {
+  if (!currentTaskId.value) {
+    ElMessage.warning('当前任务暂无可跳转的报告')
+    return
+  }
+
+  router.push({
+    name: 'HistoryDetail',
+    params: { taskId: currentTaskId.value }
+  })
+}
+
 const toggleAnalysis = () => {
   if (isAnalyzing.value) {
     stopAnalysis()
@@ -290,6 +401,7 @@ const submitTask = async () => {
   Object.keys(behaviorData).forEach(k => {
     behaviorData[k as keyof typeof behaviorData] = 0
   })
+  resetReportSummary()
 
   try {
     const formData = new FormData()
@@ -389,6 +501,13 @@ const startPolling = (taskId: number) => {
             nextTick(() => drawBoxes(detailMapByFrame.value[0] || [], 'image'))
           }
 
+          reportSummary.visible = true
+          reportSummary.attendanceCount = analysisResult.attendanceCount
+          reportSummary.totalScore = analysisResult.totalScore
+          reportSummary.reportLevel = getReportLevel(Number(analysisResult.totalScore || 0))
+          reportSummary.attendanceRateText = getAttendanceRateText(Number(analysisResult.attendanceCount || 0))
+          reportSummary.summaryText = buildSummaryText(Number(analysisResult.totalScore || 0))
+
           ElMessage.success('分析完成，结果已更新到页面')
         } catch (e) {
           console.error('拉取任务详情失败', e)
@@ -406,6 +525,7 @@ const startPolling = (taskId: number) => {
       console.error('轮询任务状态失败', error)
       stopPolling()
       loadingToggle.value = false
+      isAnalyzing.value = false
       ElMessage.error('获取分析状态失败')
     }
   }, 2000)
@@ -455,26 +575,33 @@ const startAnalysis = () => {
   wsManager.connect()
 }
 
-const stopAnalysis = () => {
+const stopAnalysis = (silent = false) => {
   isAnalyzing.value = false
-  ElMessage.warning({ message: '分析已停止', grouping: true })
-  
+  loadingToggle.value = false
+
+  if (!silent) {
+    ElMessage.warning({ message: '分析已停止', grouping: true })
+  }
+
   stopCapture()
   stopPolling()
   currentTaskId.value = null
   detailMapByFrame.value = {}
-  
+
   if (wsManager) {
     wsManager.close()
     wsManager = null
   }
-  
+
   attendanceRate.value = 0
   focusScore.value = 0
-  Object.keys(behaviorData).forEach(k => behaviorData[k as keyof typeof behaviorData] = 0)
-  
+  Object.keys(behaviorData).forEach(k => {
+    behaviorData[k as keyof typeof behaviorData] = 0
+  })
+  resetReportSummary()
+
   const canvas = mediaDisplayRef.value?.boxCanvas
-  if(canvas) {
+  if (canvas) {
     const ctx = canvas.getContext('2d')
     if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height)
   }
@@ -607,7 +734,7 @@ const handleLocalVideoTimeUpdate = () => {
 
 onUnmounted(() => {
   stopPolling()
-  stopAnalysis()
+  stopAnalysis(true)
   stopCamera()
 })
 </script>

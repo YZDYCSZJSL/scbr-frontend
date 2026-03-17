@@ -140,6 +140,52 @@
           </template>
         </el-table-column>
 
+        <el-table-column label="评估结果" min-width="180">
+  <template #default="{ row }">
+    <div v-if="Number(row.status) === 2" class="flex flex-col text-sm leading-6">
+      <span class="text-gray-700">
+        综合评分：
+        <span class="font-semibold text-gray-900">
+          {{ row.totalScore ?? '-' }}
+        </span>
+      </span>
+      <span class="text-gray-700">
+        实到人数：
+        <span class="font-semibold text-gray-900">
+          {{ row.attendanceCount ?? '-' }}
+        </span>
+      </span>
+      <span class="text-gray-700">
+        等级：
+        <span
+          class="font-semibold"
+          :class="
+            Number(row.totalScore) >= 90
+              ? 'text-green-600'
+              : Number(row.totalScore) >= 80
+                ? 'text-blue-600'
+                : Number(row.totalScore) >= 70
+                  ? 'text-yellow-600'
+                  : 'text-red-600'
+          "
+        >
+          {{
+            Number(row.totalScore) >= 90
+              ? '优秀'
+              : Number(row.totalScore) >= 80
+                ? '良好'
+                : Number(row.totalScore) >= 70
+                  ? '一般'
+                  : '需关注'
+          }}
+        </span>
+      </span>
+    </div>
+
+    <span v-else class="text-gray-400">-</span>
+  </template>
+</el-table-column>
+
         <el-table-column prop="createdAt" label="发现时间" width="160" align="center">
           <template #default="{ row }">
             <span class="text-gray-500 text-sm font-mono">{{ row.createdAt || '-' }}</span>
@@ -153,7 +199,7 @@
                 <el-icon class="mr-1"><View /></el-icon> 详情日志
               </el-button>
 
-              <el-button
+             <el-button
                 v-if="Number(row.status) === 2"
                 type="success"
                 link
@@ -161,7 +207,7 @@
                 class="!m-0 font-medium hover:text-green-700"
                 @click="goToReport(row)"
               >
-                <el-icon class="mr-1"><DataAnalysis /></el-icon> 查看报表
+                <el-icon class="mr-1"><DataAnalysis /></el-icon> 查看报告
               </el-button>
 
               <el-button
@@ -257,6 +303,7 @@ async function fetchList() {
     queryForm.value.size = res.size || queryForm.value.size
   } catch (error) {
     console.error('获取任务中心列表失败：', error)
+    ElMessage.error('获取任务中心列表失败')
   } finally {
     loading.value = false
   }
@@ -299,12 +346,7 @@ function openDetail(row) {
 }
 
 function goToReport(row) {
-  router.push({
-    path: '/history',
-    query: {
-      taskId: row.id
-    }
-  })
+  router.push(`/history/${row.id}`)
 }
 
 async function handleRetry(row) {
