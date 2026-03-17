@@ -2,10 +2,23 @@ import { defineStore } from 'pinia'
 import request from '@/utils/request'
 
 export const useUserStore = defineStore('user', {
-    state: () => ({
-        token: localStorage.getItem('token') || '',
-        userInfo: JSON.parse(localStorage.getItem('userInfo') || '{}')
-    }),
+    state: () => {
+        let initUserInfo = {}
+        try {
+            const storedInfo = localStorage.getItem('userInfo')
+            initUserInfo = storedInfo ? JSON.parse(storedInfo) : {}
+            // 兜底处理：如果解析出来不是对象，或者为空，则给空对象
+            if (typeof initUserInfo !== 'object' || initUserInfo === null) {
+                initUserInfo = {}
+            }
+        } catch (e) {
+            initUserInfo = {}
+        }
+        return {
+            token: localStorage.getItem('token') || '',
+            userInfo: initUserInfo
+        }
+    },
     actions: {
         // 真实 API 登录
         async login(loginForm) {

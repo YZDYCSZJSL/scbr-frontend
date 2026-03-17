@@ -44,17 +44,31 @@ service.interceptors.response.use(
 
         // code = 401: Token 失效，自动跳转至登录页
         if (res.code === 401) {
+            const currentPath = router.currentRoute.value.path
+            // 如果已经在登录页（如：登录失败），就不做重复弹窗和跳转
+            if (currentPath !== '/login') {
+                ElMessage({
+                    message: res.message || '登录状态已过期，请重新登录',
+                    type: 'warning',
+                    duration: 3 * 1000
+                })
+                const userStore = useUserStore()
+                // 清除用户信息并重定向到登录页（带上回跳地址）
+                userStore.logout().then(() => {
+                    router.push(`/login?redirect=${currentPath}`)
+                })
+            }
+            return Promise.reject(new Error(res.message || 'Token 失效'))
+        }
+
+        // code = 403: 无权限访问
+        if (res.code === 403) {
             ElMessage({
-                message: res.message || '登录状态已过期，请重新登录',
+                message: res.message || '无权限访问',
                 type: 'warning',
                 duration: 3 * 1000
             })
-            const userStore = useUserStore()
-            // 清除用户信息并重定向到登录页
-            userStore.logout().then(() => {
-                router.push('/login')
-            })
-            return Promise.reject(new Error(res.message || 'Token 失效'))
+            return Promise.reject(new Error(res.message || 'Forbidden'))
         }
 
         // code = 500 或其它非 200 错误：弹出后端返回的 message 错误提示

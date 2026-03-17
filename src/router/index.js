@@ -114,6 +114,15 @@ router.beforeEach((to, from, next) => {
         if (to.path === '/login') {
             next({ path: '/' })
         } else {
+            // 兜底判断：如果有 token，但是 userInfo 丢失或者格式异常导致拿不到 role
+            if (!userStore.userInfo || typeof userStore.userInfo.role === 'undefined') {
+                console.warn('UserInfo is missing or corrupted, requiring re-login')
+                userStore.logout().then(() => {
+                    next(`/login?redirect=${to.path}`)
+                })
+                return
+            }
+
             // 判断权限
             const requiredRoles = to.meta.roles
             if (requiredRoles && !requiredRoles.includes(userStore.userInfo.role)) {
