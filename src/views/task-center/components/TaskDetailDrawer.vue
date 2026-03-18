@@ -1,11 +1,11 @@
 <template>
   <el-drawer
     :model-value="modelValue"
-    title="分析任务诊断面板"
+    title="识别任务详情"
     size="55%"
     destroy-on-close
     class="custom-task-drawer"
-    :header-style="{ marginBottom: '0', borderBottom: '1px solid #f3f4f6', paddingBottom: '16px', fontWeight: 'bold' }"
+    :header-style="{ marginBottom: '0', borderBottom: '1px solid #f3f4f6', paddingBottom: '16px', paddingTop: '20px', paddingLeft: '24px', paddingRight: '24px', fontWeight: 'bold' }"
     @close="handleClose"
   >
     <template v-if="loading">
@@ -15,10 +15,10 @@
     </template>
 
     <template v-else>
-      <div class="flex flex-col gap-4 p-5 bg-gray-50 min-h-full">
+      <div class="flex flex-col gap-4 p-6 bg-gray-50 min-h-full">
         <!-- 基础信息卡片 -->
         <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden flex-shrink-0">
-          <div class="bg-gradient-to-r from-blue-50 to-white px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+          <div class="bg-gradient-to-r from-blue-50 to-white px-5 py-4 border-b border-gray-100 flex items-center justify-between">
             <span class="font-bold text-gray-700 flex items-center space-x-2">
               <el-icon class="text-blue-500"><InfoFilled /></el-icon>
               <span>任务基础信息</span>
@@ -90,31 +90,65 @@
         </div>
         
         <!-- 结果摘要 (仅成功时) -->
-        <div v-if="Number(detail.status) === 2" class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden flex gap-4 p-4 items-center flex-shrink-0">
-          <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-green-400 to-emerald-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-green-500/30">
-            <el-icon :size="24"><Check /></el-icon>
-          </div>
-          <div class="flex-1 flex justify-around items-center px-4">
-            <div class="flex flex-col items-center gap-1">
-              <span class="text-gray-400 text-[11px] font-bold tracking-wider uppercase">综合评分</span>
-              <span class="text-2xl font-black text-emerald-500 font-mono">{{ detail.totalScore ?? '-' }}</span>
+        <div
+          v-if="Number(detail.status) === 2"
+          class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden p-4 flex flex-col gap-4 flex-shrink-0"
+        >
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-green-400 to-emerald-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-green-500/30">
+                <el-icon :size="24"><Check /></el-icon>
+              </div>
+              <div>
+                <div class="text-base font-bold text-gray-800">识别结果已生成</div>
+                <div class="text-xs text-gray-400 mt-1">当前任务已完成识别，可进入评估报告查看趋势与异常抓拍</div>
+              </div>
             </div>
-            <div class="w-px h-10 bg-gray-100"></div>
-            <div class="flex flex-col items-center gap-1">
-              <span class="text-gray-400 text-[11px] font-bold tracking-wider uppercase">实到人数</span>
-              <span class="text-2xl font-black text-indigo-500 font-mono">{{ detail.attendanceCount ?? '-' }}</span>
-            </div>
-          </div>
-          <div class="shrink-0 pl-5 border-l border-gray-100">
+
             <el-button type="success" plain class="font-bold border-green-200" @click="goToReport">
-              <el-icon class="mr-1"><DataAnalysis /></el-icon> 分析图表台账
+              <el-icon class="mr-1"><DataAnalysis /></el-icon> 查看评估报告
             </el-button>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div class="rounded-xl border border-gray-100 bg-gray-50 px-4 py-4">
+              <div class="text-xs text-gray-400 mb-1">综合评分</div>
+              <div class="text-2xl font-black text-emerald-500 font-mono">{{ detail.totalScore ?? '-' }}</div>
+            </div>
+
+            <div class="rounded-xl border border-gray-100 bg-gray-50 px-4 py-4">
+              <div class="text-xs text-gray-400 mb-1">实到人数</div>
+              <div class="text-2xl font-black text-indigo-500 font-mono">{{ detail.attendanceCount ?? '-' }}</div>
+            </div>
+
+            <div class="rounded-xl border border-gray-100 bg-gray-50 px-4 py-4">
+              <div class="text-xs text-gray-400 mb-1">识别耗时</div>
+              <div class="text-2xl font-black text-blue-500 font-mono">{{ formatDuration(detail.durationSeconds) }}</div>
+            </div>
+          </div>
+
+          <div class="rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3 text-sm text-emerald-700 leading-6">
+            {{ successSummaryText }}
+          </div>
+        </div>
+
+
+        <div
+          v-if="Number(detail.status) === 3"
+          class="bg-white rounded-xl border border-red-100 shadow-sm overflow-hidden p-4 flex flex-col gap-3 flex-shrink-0"
+        >
+          <div class="text-base font-bold text-red-600">任务执行失败</div>
+          <div class="text-sm text-red-500 leading-6">
+            当前任务未完成识别流程，建议先查看下方节点执行轨迹，再决定是否重新启动分析。
+          </div>
+          <div class="rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-600 leading-6">
+            {{ detail.failReason || '未知系统异常' }}
           </div>
         </div>
 
         <!-- 任务日志卡片 -->
         <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">
-          <div class="bg-gray-50 px-5 py-3 border-b border-gray-100 flex items-center justify-between shrink-0">
+          <div class="bg-gray-50 px-5 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
             <span class="font-bold text-gray-700 flex items-center space-x-2">
               <el-icon class="text-indigo-500"><Document /></el-icon>
               <span>节点执行轨迹</span>
@@ -146,7 +180,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch,computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { InfoFilled, Right, WarningFilled, Check, DataAnalysis, Document, RefreshRight } from '@element-plus/icons-vue'
@@ -172,6 +206,29 @@ const loading = ref(false)
 const retryLoading = ref(false)
 const detail = ref({})
 const logs = ref([])
+
+const successSummaryText = computed(() => {
+  const score = Number(detail.value?.totalScore)
+  const attendance = detail.value?.attendanceCount ?? '-'
+
+  if (!Number.isFinite(score)) {
+    return '当前任务已完成识别处理，可进入评估报告页查看更详细的趋势与异常抓拍信息。'
+  }
+
+  if (score >= 90) {
+    return `本次识别结果显示课堂整体状态较好，综合评分较高，当前实到人数为 ${attendance}。`
+  }
+
+  if (score >= 80) {
+    return `本次识别结果显示课堂整体表现良好，建议进一步进入评估报告查看行为趋势变化。`
+  }
+
+  if (score >= 70) {
+    return `本次识别结果显示课堂状态基本正常，但已有一定波动，建议查看异常抓拍与趋势分析。`
+  }
+
+  return `本次识别结果显示课堂存在需关注片段，建议尽快进入评估报告定位异常行为与时间段。`
+})
 
 watch(
   () => [props.modelValue, props.taskId],
@@ -280,13 +337,9 @@ function formatDuration(seconds) {
 }
 
 function goToReport() {
-  router.push({
-    path: '/history',
-    query: {
-      taskId: props.taskId
-    }
-  })
+  router.push(`/history/${props.taskId}`)
 }
+
 </script>
 
 <style scoped>

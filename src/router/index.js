@@ -31,13 +31,13 @@ const routes = [
                 path: 'task-center',
                 name: 'TaskCenter',
                 component: () => import('@/views/task-center/index.vue'),
-                meta: { title: '分析任务中心', icon: 'List' }
+                meta: { title: 'AI课堂行为识别', icon: 'List' }
             },
             {
                 path: 'history',
                 name: 'History',
                 component: () => import('@/views/history/index.vue'),
-                meta: { title: '课堂分析报告', icon: 'DataLine' }
+                meta: { title: '课堂行为评估报告', icon: 'DataLine' }
             },
             {
                 path: 'history/:taskId',

@@ -1,5 +1,5 @@
 <template>
-  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col h-full">
+  <div class="flex flex-col h-full gap-4 p-5">
     <!-- <el-alert
       title="本页面用于查看已分析完成的课堂结果、评分、行为统计与导出，不展示任务执行日志与失败重试。"
       type="success"
@@ -8,15 +8,15 @@
       class="page-tip shrink-0 mb-4"
     /> -->
     <!-- 顶栏 (类似参考图样式) -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex flex-wrap justify-between items-center gap-4 shrink-0 mb-4">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-wrap justify-between items-center gap-4 shrink-0">
       <!-- 左侧：图标与标题 -->
       <div class="flex items-center gap-4">
         <div class="w-12 h-12 rounded-xl bg-green-50 text-green-600 flex items-center justify-center shrink-0">
           <el-icon :size="24"><Document /></el-icon>
         </div>
         <div class="flex flex-col">
-          <span class="text-[17px] font-bold text-gray-800 tracking-wide">课堂分析报告</span>
-          <span class="text-[12px] text-gray-400 mt-1">查看课堂结果及数据导出</span>
+          <span class="text-[17px] font-bold text-gray-800 tracking-wide">课堂行为评估报告</span>
+          <span class="text-[12px] text-gray-400 mt-1">查看已完成识别的课堂评估结果、异常标记与报告入口</span>
         </div>
       </div>
 
@@ -43,12 +43,14 @@
           class="!w-[240px]"
         />
 
-        <el-button type="primary" color="#409eff" class="px-5 font-medium ml-1" @click="fetchData">
+        <el-button type="primary" class="px-5 font-medium ml-1" @click="fetchData">
           <el-icon class="mr-1"><Search /></el-icon>查询
+        </el-button>
+        <el-button class="px-5 font-medium" @click="handleReset">
+          重置
         </el-button>
 
         <el-button
-          color="#67c23a"
           type="success"
           class="px-5 font-medium"
           @click="handleBatchExport"
@@ -58,8 +60,30 @@
       </div>
     </div>
 
+    <!-- 报告概览卡片 -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 shrink-0">
+    <div
+      v-for="item in reportOverviewCards"
+      :key="item.label"
+      class="bg-white rounded-xl shadow-sm border border-gray-100 p-5"
+    >
+      <div class="text-sm text-gray-500 mb-2">{{ item.label }}</div>
+      <div class="text-3xl font-bold text-gray-900">{{ item.value }}</div>
+      <div class="text-xs text-gray-400 mt-2">{{ item.tip }}</div>
+    </div>
+  </div>
+
     <!-- 数据表格 -->
-    <div class="flex-1 overflow-hidden rounded-lg border border-gray-100">
+    <div class="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col min-h-0">
+      <div class="flex justify-between items-center bg-gray-50/50 px-5 py-4 border-b border-gray-100 shrink-0">
+        <div class="flex items-center space-x-2">
+          <div class="w-1 h-4 bg-green-500 rounded-full"></div>
+          <span class="font-bold text-gray-700">课堂评估报告台账</span>
+        </div>
+        <el-button plain size="small" @click="fetchData" class="text-gray-600 hover:text-green-600">
+          <el-icon class="mr-1"><RefreshRight /></el-icon>刷新列表
+        </el-button>
+      </div>
       <el-table 
         v-loading="loading" 
         :data="tableData" 
@@ -89,7 +113,7 @@
         </el-table-column>
         <el-table-column prop="createdAt" label="分析时间" width="180" />
 
-        <el-table-column label="综合得分" width="140" align="center">
+        <el-table-column label="综合评分" width="140" align="center">
           <template #default="{ row }">
             <div class="flex items-center justify-center space-x-2">
               <template v-if="row.status === 2">
@@ -113,14 +137,19 @@
             </span>
           </template>
         </el-table-column>
-        <el-table-column label="出勤率" width="110" align="center">
+        <el-table-column label="报告结论" min-width="220">
           <template #default="{ row }">
-            <span class="font-semibold text-slate-700">
-              {{ row.attendanceRate != null ? `${row.attendanceRate}%` : '-' }}
-            </span>
+            <div class="text-sm leading-6">
+              <div class="font-medium text-gray-800">
+                {{ reportConclusionText(row) }}
+              </div>
+              <div class="text-[12px] text-gray-400 mt-1">
+                出勤率：{{ row.attendanceRate != null ? `${row.attendanceRate}%` : '-' }}
+              </div>
+            </div>
           </template>
         </el-table-column>
-        <el-table-column label="评估等级" width="110" align="center">
+        <el-table-column label="课堂等级" width="110" align="center">
           <template #default="{ row }">
             <el-tag
               v-if="row.reportLevel"
@@ -143,7 +172,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="异常标记" width="110" align="center">
+        <el-table-column label="异常状态" width="110" align="center">
           <template #default="{ row }">
             <el-tag
               v-if="Number(row.abnormalFlag) === 1"
@@ -170,37 +199,37 @@
           <template #default="scope">
             <div class="flex items-center justify-center gap-3">
               <el-button @click="showDetail(scope.row)" link type="primary" size="small" class="!m-0 font-medium hover:text-blue-700">
-                <el-icon class="mr-1"><DataLine /></el-icon>查看报告
+                <el-icon class="mr-1"><DataLine /></el-icon>查看评估报告
               </el-button>
               <el-button @click="handleExport(scope.row)" link type="success" size="small" class="!m-0 font-medium hover:text-green-700">
-                <el-icon class="mr-1"><Download /></el-icon>导出
+                <el-icon class="mr-1"><Download /></el-icon>导出报告
               </el-button>
             </div>
           </template>
         </el-table-column>
       </el-table>
-    </div>
 
-    <!-- 分页器 -->
-    <div class="mt-5 flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100 shrink-0">
-      <div class="text-sm text-gray-500 font-medium ml-2">总记录数：<span class="text-gray-900 font-bold">{{ total }}</span></div>
-      <el-pagination
-        v-model:current-page="searchQuery.page"
-        v-model:page-size="searchQuery.size"
-        :page-sizes="[10, 20, 50]"
-        layout="sizes, prev, pager, next, jumper"
-        :total="total"
-        background
-        @size-change="fetchData"
-        @current-change="fetchData"
-      />
+      <!-- 分页器 -->
+      <div class="flex justify-between items-center bg-white px-5 py-4 border-t border-gray-100 shrink-0">
+        <div class="text-sm text-gray-500 font-medium">总记录数：<span class="text-gray-900 font-bold">{{ total }}</span></div>
+        <el-pagination
+          v-model:current-page="searchQuery.page"
+          v-model:page-size="searchQuery.size"
+          :page-sizes="[10, 20, 50]"
+          layout="sizes, prev, pager, next, jumper"
+          :total="total"
+          background
+          @size-change="fetchData"
+          @current-change="fetchData"
+        />
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
-import { Search, Download, Document, DataLine, TopRight, BottomRight } from '@element-plus/icons-vue'
+import { ref, reactive, onMounted ,computed} from 'vue'
+import { Search, Download, Document, DataLine, TopRight, BottomRight, RefreshRight } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { getReportPage, exportReportToExcel } from './api/index'
 import { useRouter } from 'vue-router'
@@ -219,6 +248,83 @@ const searchQuery = reactive({
   page: 1,
   size: 10
 })
+
+const reportOverviewCards = computed(() => {
+  const list = tableData.value || []
+  const count = list.length
+
+  const avgScore =
+    count > 0
+      ? (
+          list.reduce((sum, item) => sum + Number(item.totalScore || 0), 0) / count
+        ).toFixed(1)
+      : '-'
+
+  const abnormalCount = list.filter(item => Number(item.abnormalFlag) === 1).length
+  const goodCount = list.filter(item => ['优秀', '良好'].includes(item.reportLevel)).length
+
+  return [
+    {
+      label: '当前页报告数',
+      value: count,
+      tip: '当前筛选结果中可查看的课堂报告数量'
+    },
+    {
+      label: '平均评分',
+      value: avgScore,
+      tip: '当前页报告的综合评分均值'
+    },
+    {
+      label: '异常课堂数',
+      value: abnormalCount,
+      tip: '存在异常标记的课堂数量'
+    },
+    {
+      label: '优良课堂数',
+      value: goodCount,
+      tip: '等级为优秀或良好的课堂数量'
+    }
+  ]
+})
+
+function handleReset() {
+  searchQuery.keyword = ''
+  searchQuery.dateRange = null
+  searchQuery.page = 1
+  fetchData()
+}
+
+function reportConclusionText(row) {
+  const level = row?.reportLevel
+  const abnormal = Number(row?.abnormalFlag) === 1
+  const attendanceRate = Number(row?.attendanceRate)
+
+  if (abnormal && Number.isFinite(attendanceRate) && attendanceRate < 80) {
+    return '课堂存在异常片段，且出勤率偏低，建议优先查看详情'
+  }
+
+  if (abnormal) {
+    return '课堂识别到异常片段，建议重点查看趋势与抓拍内容'
+  }
+
+  if (level === '优秀') {
+    return '课堂整体表现优良，识别结果较稳定'
+  }
+
+  if (level === '良好') {
+    return '课堂整体状态良好，可进一步查看行为画像'
+  }
+
+  if (level === '一般') {
+    return '课堂表现基本正常，建议结合详情页继续分析'
+  }
+
+  if (level) {
+    return '课堂存在需关注内容，建议查看评估详情'
+  }
+
+  return '当前暂无明确评估结论'
+}
 
 const fetchData = async () => {
   loading.value = true

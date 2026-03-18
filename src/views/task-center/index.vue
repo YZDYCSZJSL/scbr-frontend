@@ -1,15 +1,15 @@
 <template>
-  <div class="flex flex-col h-full gap-4">
+  <div class="flex flex-col h-full gap-4 p-5">
     <!-- 顶栏 (类似参考图样式) -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex justify-between items-center gap-4 shrink-0 overflow-x-auto whitespace-nowrap">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex justify-between items-center gap-4 shrink-0 overflow-x-auto whitespace-nowrap">
       <!-- 左侧：图标与标题 -->
       <div class="flex items-center gap-4 shrink-0">
         <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-500 flex items-center justify-center shrink-0">
           <el-icon :size="24"><Monitor /></el-icon>
         </div>
         <div class="flex flex-col">
-          <span class="text-[17px] font-bold text-gray-800 tracking-wide">任务中心</span>
-          <span class="text-[12px] text-gray-400 mt-1">管理及查看任务执行信息</span>
+          <span class="text-[17px] font-bold text-gray-800 tracking-wide">AI课堂行为识别</span>
+          <span class="text-[12px] text-gray-400 mt-1">查看课堂识别任务、执行状态与评估入口</span>
         </div>
       </div>
 
@@ -60,7 +60,7 @@
           class="!w-[230px]"
         />
 
-        <el-button type="primary" color="#409eff" class="px-5 font-medium ml-1" @click="handleSearch">
+        <el-button type="primary" class="px-5 font-medium ml-1" @click="handleSearch">
           <el-icon class="mr-1"><Search /></el-icon>查询
         </el-button>
         <el-button class="px-4 font-medium" plain @click="handleReset">
@@ -69,13 +69,26 @@
       </div>
     </div>
 
+    <!-- 任务概览卡片 -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 shrink-0">
+      <div
+        v-for="item in taskOverviewCards"
+        :key="item.label"
+        class="bg-white rounded-xl shadow-sm border border-gray-100 p-5"
+      >
+        <div class="text-sm text-gray-500 mb-2">{{ item.label }}</div>
+        <div class="text-3xl font-bold text-gray-900">{{ item.value }}</div>
+        <div class="text-xs text-gray-400 mt-2">{{ item.tip }}</div>
+      </div>
+    </div>
+
     <!-- 数据表格 -->
-    <div class="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
+    <div class="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col min-h-0">
       <!-- 列表标题与工具栏 -->
-      <div class="flex justify-between items-center bg-gray-50/50 px-4 py-3 border-b border-gray-100 shrink-0">
+      <div class="flex justify-between items-center bg-gray-50/50 px-5 py-4 border-b border-gray-100 shrink-0">
         <div class="flex items-center space-x-2">
           <div class="w-1 h-4 bg-blue-500 rounded-full"></div>
-          <span class="font-bold text-gray-700">分析任务执行台账</span>
+          <span class="font-bold text-gray-700">课堂行为识别任务台账</span>
         </div>
         <el-button plain size="small" @click="fetchList" class="text-gray-600 hover:text-blue-600">
           <el-icon class="mr-1"><RefreshRight /></el-icon>刷新状态
@@ -117,11 +130,21 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="任务状态" width="100" align="center">
+        <el-table-column label="任务状态" width="140" align="center">
           <template #default="{ row }">
-            <el-tag :type="statusTagType(row.status)" effect="light" class="!border-none font-bold w-16 text-center" size="small">
-              {{ statusText(row.status) }}
-            </el-tag>
+            <div class="flex flex-col items-center gap-1">
+              <el-tag
+                :type="statusTagType(row.status)"
+                effect="light"
+                class="!border-none font-bold min-w-[72px] text-center"
+                size="small"
+              >
+                {{ statusText(row.status) }}
+              </el-tag>
+              <span class="text-[11px] text-gray-400">
+                {{ reportStatusText(row) }}
+              </span>
+            </div>
           </template>
         </el-table-column>
 
@@ -140,51 +163,45 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="评估结果" min-width="180">
-  <template #default="{ row }">
-    <div v-if="Number(row.status) === 2" class="flex flex-col text-sm leading-6">
-      <span class="text-gray-700">
-        综合评分：
-        <span class="font-semibold text-gray-900">
-          {{ row.totalScore ?? '-' }}
-        </span>
-      </span>
-      <span class="text-gray-700">
-        实到人数：
-        <span class="font-semibold text-gray-900">
-          {{ row.attendanceCount ?? '-' }}
-        </span>
-      </span>
-      <span class="text-gray-700">
-        等级：
-        <span
-          class="font-semibold"
-          :class="
-            Number(row.totalScore) >= 90
-              ? 'text-green-600'
-              : Number(row.totalScore) >= 80
-                ? 'text-blue-600'
-                : Number(row.totalScore) >= 70
-                  ? 'text-yellow-600'
-                  : 'text-red-600'
-          "
-        >
-          {{
-            Number(row.totalScore) >= 90
-              ? '优秀'
-              : Number(row.totalScore) >= 80
-                ? '良好'
-                : Number(row.totalScore) >= 70
-                  ? '一般'
-                  : '需关注'
-          }}
-        </span>
-      </span>
-    </div>
+        <el-table-column label="识别结论" min-width="220">
+          <template #default="{ row }">
+            <div v-if="Number(row.status) === 2" class="flex flex-col text-sm leading-6">
+              <span class="text-gray-700">
+                综合评分：
+                <span class="font-semibold text-gray-900">
+                  {{ row.totalScore ?? '-' }}
+                </span>
+              </span>
+              <span class="text-gray-700">
+                实到人数：
+                <span class="font-semibold text-gray-900">
+                  {{ row.attendanceCount ?? '-' }}
+                </span>
+              </span>
+              <span class="text-gray-700">
+                等级：
+                <span class="font-semibold" :class="evaluationLevelClass(row.totalScore)">
+                  {{ evaluationLevelText(row.totalScore) }}
+                </span>
+              </span>
+              <span class="text-[12px] text-gray-400 mt-1">
+                {{ riskHintText(row) }}
+              </span>
+            </div>
 
-    <span v-else class="text-gray-400">-</span>
-  </template>
-</el-table-column>
+            <span v-else-if="Number(row.status) === 1" class="text-gray-400 text-sm">
+              正在生成识别结果，请稍后查看
+            </span>
+
+            <span v-else-if="Number(row.status) === 0" class="text-gray-400 text-sm">
+              任务已进入队列，等待模型分析
+            </span>
+
+            <span v-else class="text-red-400 text-sm">
+              当前任务执行失败，请查看日志后重试
+            </span>
+          </template>
+        </el-table-column>
 
         <el-table-column prop="createdAt" label="发现时间" width="160" align="center">
           <template #default="{ row }">
@@ -196,7 +213,7 @@
           <template #default="{ row }">
             <div class="flex items-center justify-center gap-3">
               <el-button type="primary" link size="small" class="!m-0 font-medium hover:text-blue-700" @click="openDetail(row)">
-                <el-icon class="mr-1"><View /></el-icon> 详情日志
+                <el-icon class="mr-1"><View /></el-icon> 任务详情
               </el-button>
 
              <el-button
@@ -224,21 +241,21 @@
           </template>
         </el-table-column>
       </el-table>
-    </div>
 
-    <!-- 分页器 -->
-    <div class="mt-4 flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100 shrink-0">
-      <div class="text-sm text-gray-500 font-medium ml-2">总任务数：<span class="text-gray-900 font-bold">{{ total }}</span></div>
-      <el-pagination
-        background
-        layout="sizes, prev, pager, next, jumper"
-        :total="total"
-        v-model:current-page="queryForm.page"
-        v-model:page-size="queryForm.size"
-        :page-sizes="[10, 20, 50, 100]"
-        @current-change="handlePageChange"
-        @size-change="handleSizeChange"
-      />
+      <!-- 分页器移入表格区块 -->
+      <div class="flex justify-between items-center bg-white px-5 py-4 border-t border-gray-100 shrink-0">
+        <div class="text-sm text-gray-500 font-medium">总任务数：<span class="text-gray-900 font-bold">{{ total }}</span></div>
+        <el-pagination
+          background
+          layout="sizes, prev, pager, next, jumper"
+          :total="total"
+          v-model:current-page="queryForm.page"
+          v-model:page-size="queryForm.size"
+          :page-sizes="[10, 20, 50, 100]"
+          @current-change="handlePageChange"
+          @size-change="handleSizeChange"
+        />
+      </div>
     </div>
 
     <TaskDetailDrawer
@@ -250,7 +267,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, RefreshRight, View, DataAnalysis, Warning, Monitor } from '@element-plus/icons-vue'
@@ -265,6 +282,71 @@ const tableData = ref([])
 const dateRange = ref([])
 const detailVisible = ref(false)
 const currentTaskId = ref(null)
+
+const countByStatus = (status) => {
+  return tableData.value.filter(item => Number(item.status) === Number(status)).length
+}
+
+const taskOverviewCards = computed(() => [
+  {
+    label: '任务总数',
+    value: total.value || tableData.value.length || 0,
+    tip: '当前筛选条件下的识别任务数量'
+  },
+  {
+    label: '分析成功',
+    value: countByStatus(2),
+    tip: '已生成识别结果，可进入评估报告'
+  },
+  {
+    label: '分析中',
+    value: countByStatus(1),
+    tip: '模型正在处理，等待识别完成'
+  },
+  {
+    label: '异常任务',
+    value: countByStatus(3),
+    tip: '建议查看失败日志并按需重试'
+  }
+])
+
+function evaluationLevelText(score) {
+  const num = Number(score)
+  if (!Number.isFinite(num)) return '-'
+  if (num >= 90) return '优秀'
+  if (num >= 80) return '良好'
+  if (num >= 70) return '一般'
+  return '需关注'
+}
+
+function evaluationLevelClass(score) {
+  const num = Number(score)
+  if (!Number.isFinite(num)) return 'text-gray-400'
+  if (num >= 90) return 'text-green-600'
+  if (num >= 80) return 'text-blue-600'
+  if (num >= 70) return 'text-yellow-600'
+  return 'text-red-600'
+}
+
+function reportStatusText(row) {
+  const status = Number(row?.status)
+  if (status === 2) return '报告可查看'
+  if (status === 1) return '报告生成中'
+  if (status === 0) return '等待分析'
+  if (status === 3) return '报告未生成'
+  return '-'
+}
+
+function riskHintText(row) {
+  const score = Number(row?.totalScore)
+  const attendance = Number(row?.attendanceCount)
+
+  if (!Number.isFinite(score)) return '当前暂无识别结论'
+  if (score >= 90) return '课堂状态较稳定，无明显异常'
+  if (score >= 80) return `课堂整体表现良好，实到 ${Number.isFinite(attendance) ? attendance : '-'} 人`
+  if (score >= 70) return '课堂表现基本正常，建议进一步查看趋势变化'
+  return '课堂存在需关注片段，建议重点查看报告详情'
+}
 
 const queryForm = ref({
   page: 1,
