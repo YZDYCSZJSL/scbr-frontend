@@ -1,18 +1,18 @@
 <template>
-  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col h-full">
+  <div class="page-container">
     <!-- 顶栏 -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex justify-between items-center gap-4 shrink-0 overflow-x-auto whitespace-nowrap mb-4">
-      <div class="flex items-center gap-4 shrink-0">
+    <div class="search-bar">
+      <div class="search-bar-left">
         <div class="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
           <el-icon :size="24"><Calendar /></el-icon>
         </div>
         <div class="flex flex-col">
-          <span class="text-[17px] font-bold text-gray-800 tracking-wide">排课管理</span>
-          <span class="text-[12px] text-gray-400 mt-1">统筹课程、教师与教室安排</span>
+          <span class="page-title">排课管理</span>
+          <span class="page-desc">统筹课程、教师与教室安排</span>
         </div>
       </div>
 
-      <div class="flex items-center gap-3 shrink-0">
+      <div class="search-bar-right">
         <el-select
           v-model="selectedSearchSemesterConfigId"
           placeholder="学年学期"
@@ -56,13 +56,12 @@
           </template>
         </el-input>
 
-        <el-button type="primary" color="#409eff" class="px-5 font-medium ml-1" @click="handleSearch">
+        <el-button type="primary" color="#409eff" @click="handleSearch">
           <el-icon class="mr-1"><Search /></el-icon>查询
         </el-button>
 
         <el-button
           plain
-          class="px-4 font-medium"
           @click="switchViewMode(viewMode === 'list' ? 'week' : 'list')"
         >
           <el-icon class="mr-1">
@@ -74,7 +73,6 @@
         <el-button
           color="#67c23a"
           type="success"
-          class="px-5 font-medium shadow-sm ml-1"
           @click="handleAdd"
         >
           <el-icon class="mr-1"><Plus /></el-icon>新增排课
@@ -83,7 +81,7 @@
     </div>
 
     <!-- 数据展示区 -->
-    <div class="flex-1 overflow-hidden rounded-lg border border-gray-100">
+    <div class="table-container">
       <!-- 列表视图 -->
       <ScheduleTable 
         v-if="viewMode === 'list'"
@@ -106,8 +104,8 @@
     </div>
 
     <!-- 分页器 -->
-    <div v-if="viewMode === 'list'" class="mt-5 flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100">
-      <div class="text-sm text-gray-500 font-medium ml-2">检索结果：<span class="text-blue-600 font-bold mx-1">{{ total }}</span>条数据</div>
+    <div v-if="viewMode === 'list'" class="pagination-container">
+      <div class="pagination-info">检索结果：<span class="text-blue-600 font-bold mx-1">{{ total }}</span>条数据</div>
       <el-pagination
         v-model:current-page="queryParams.page"
         v-model:page-size="queryParams.size"

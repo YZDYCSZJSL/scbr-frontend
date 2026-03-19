@@ -1,20 +1,20 @@
 <template>
-  <div class="flex flex-col h-full gap-4 p-5">
+  <div class="page-container">
     <!-- 顶栏 (类似参考图样式) -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex justify-between items-center gap-4 shrink-0 overflow-x-auto whitespace-nowrap">
+    <div class="search-bar">
       <!-- 左侧：图标与标题 -->
-      <div class="flex items-center gap-4 shrink-0">
+      <div class="search-bar-left">
         <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-500 flex items-center justify-center shrink-0">
           <el-icon :size="24"><Monitor /></el-icon>
         </div>
         <div class="flex flex-col">
-          <span class="text-[17px] font-bold text-gray-800 tracking-wide">AI课堂行为识别</span>
-          <span class="text-[12px] text-gray-400 mt-1">查看课堂识别任务、执行状态与评估入口</span>
+          <span class="page-title">AI课堂行为识别</span>
+          <span class="page-desc">查看课堂识别任务入口</span>
         </div>
       </div>
 
       <!-- 右侧：无标签内联搜索区 -->
-      <div class="flex items-center gap-3 shrink-0">
+      <div class="search-bar-right">
         <el-input
           v-model="queryForm.keyword"
           placeholder="搜索课程 / 教师"
@@ -60,35 +60,35 @@
           class="!w-[230px]"
         />
 
-        <el-button type="primary" class="px-5 font-medium ml-1" @click="handleSearch">
+        <el-button type="primary" @click="handleSearch">
           <el-icon class="mr-1"><Search /></el-icon>查询
         </el-button>
-        <el-button class="px-4 font-medium" plain @click="handleReset">
+        <el-button plain @click="handleReset">
           重置
         </el-button>
       </div>
     </div>
 
     <!-- 任务概览卡片 -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 shrink-0">
+    <div class="card-grid">
       <div
         v-for="item in taskOverviewCards"
         :key="item.label"
-        class="bg-white rounded-xl shadow-sm border border-gray-100 p-5"
+        class="overview-card"
       >
-        <div class="text-sm text-gray-500 mb-2">{{ item.label }}</div>
-        <div class="text-3xl font-bold text-gray-900">{{ item.value }}</div>
-        <div class="text-xs text-gray-400 mt-2">{{ item.tip }}</div>
+        <div class="overview-card-label">{{ item.label }}</div>
+        <div class="overview-card-value">{{ item.value }}</div>
+        <div class="overview-card-tip">{{ item.tip }}</div>
       </div>
     </div>
 
     <!-- 数据表格 -->
-    <div class="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col min-h-0">
+    <div class="table-container">
       <!-- 列表标题与工具栏 -->
-      <div class="flex justify-between items-center bg-gray-50/50 px-5 py-4 border-b border-gray-100 shrink-0">
-        <div class="flex items-center space-x-2">
-          <div class="w-1 h-4 bg-blue-500 rounded-full"></div>
-          <span class="font-bold text-gray-700">课堂行为识别任务台账</span>
+      <div class="table-header">
+        <div class="table-title">
+          <div class="w-1 h-4 bg-blue-500 rounded-full mr-2"></div>
+          <span>课堂行为识别任务台账</span>
         </div>
         <el-button plain size="small" @click="fetchList" class="text-gray-600 hover:text-blue-600">
           <el-icon class="mr-1"><RefreshRight /></el-icon>刷新状态
@@ -101,7 +101,6 @@
         style="width: 100%"
         height="100%"
         stripe
-        :header-cell-style="{ background: '#f8fafc', color: '#475569', fontWeight: 'bold' }"
       >
         <el-table-column prop="id" label="编号" width="80" align="center" />
         <el-table-column prop="courseName" label="课程名称" min-width="150" show-overflow-tooltip>
@@ -243,8 +242,8 @@
       </el-table>
 
       <!-- 分页器移入表格区块 -->
-      <div class="flex justify-between items-center bg-white px-5 py-4 border-t border-gray-100 shrink-0">
-        <div class="text-sm text-gray-500 font-medium">总任务数：<span class="text-gray-900 font-bold">{{ total }}</span></div>
+      <div class="pagination-container">
+        <div class="pagination-info">总任务数：<span class="text-gray-900 font-bold">{{ total }}</span></div>
         <el-pagination
           background
           layout="sizes, prev, pager, next, jumper"
@@ -527,11 +526,4 @@ function formatFailReason(reason) {
 </script>
 
 <style scoped>
-/* Scoped overrides to ensure clean rendering. Most styling is via Tailwind. */
-:deep(.el-table__row) {
-  transition: all 0.2s ease;
-}
-:deep(.el-table__row:hover) {
-  background-color: #f1f5f9 !important;
-}
 </style>

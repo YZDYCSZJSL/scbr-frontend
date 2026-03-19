@@ -7,6 +7,8 @@ import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import App from './App.vue'
 import router from './router'
 import './style.css' // 引入 tailwind css，且在 Element Plus 之后挂载，方便覆盖样式
+import './styles/element-theme.css' // 全局 Element Plus 主题统一覆盖
+import './styles/common.css' // 全局通用页面容器样式
 
 const app = createApp(App)
 const pinia = createPinia()

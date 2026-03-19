@@ -1,7 +1,7 @@
 <template>
-  <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
-    <div class="flex items-center space-x-4">
-      <span class="font-bold text-gray-700 text-lg">实时课堂分析</span>
+  <div class="search-bar">
+    <div class="search-bar-left">
+      <span class="page-title !text-lg text-gray-700">实时课堂分析</span>
       <!-- Schedule Selector -->
       <el-select 
         v-model="internalSelectedClass" 
@@ -49,7 +49,7 @@
       </el-radio-group>
     </div>
 
-    <div class="flex items-center">
+    <div class="search-bar-right">
       <!-- Start Analysis Button -->
       <el-button 
         :type="isAnalyzing ? 'danger' : 'primary'" 

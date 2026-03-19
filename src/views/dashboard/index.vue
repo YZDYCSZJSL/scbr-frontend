@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col h-full space-y-4">
+  <div class="page-container">
     <!-- Top Control Bar -->
     <TopControlBar
       v-model:selectedClass="selectedClass"

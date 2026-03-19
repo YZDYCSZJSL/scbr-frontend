@@ -1,5 +1,5 @@
 <template>
-  <div class="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col overflow-y-auto">
+  <div class="flex-1 overview-card flex flex-col overflow-y-auto !h-auto">
     <h3 class="font-bold text-lg text-gray-800 border-b pb-3 mb-4 flex items-center">
       <span class="p-1.5 bg-blue-100 text-blue-600 rounded-lg mr-2">
         <el-icon><DataAnalysis /></el-icon>

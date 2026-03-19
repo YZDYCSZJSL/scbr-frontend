@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col h-full gap-4 p-5">
+  <div class="page-container">
     <!-- <el-alert
       title="本页面用于查看已分析完成的课堂结果、评分、行为统计与导出，不展示任务执行日志与失败重试。"
       type="success"
@@ -8,20 +8,20 @@
       class="page-tip shrink-0 mb-4"
     /> -->
     <!-- 顶栏 (类似参考图样式) -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-wrap justify-between items-center gap-4 shrink-0">
+    <div class="search-bar">
       <!-- 左侧：图标与标题 -->
-      <div class="flex items-center gap-4">
+      <div class="search-bar-left">
         <div class="w-12 h-12 rounded-xl bg-green-50 text-green-600 flex items-center justify-center shrink-0">
           <el-icon :size="24"><Document /></el-icon>
         </div>
         <div class="flex flex-col">
-          <span class="text-[17px] font-bold text-gray-800 tracking-wide">课堂行为评估报告</span>
-          <span class="text-[12px] text-gray-400 mt-1">查看已完成识别的课堂评估结果、异常标记与报告入口</span>
+          <span class="page-title">课堂行为评估报告</span>
+          <span class="page-desc">查看已完成识别的课堂评估入口</span>
         </div>
       </div>
 
       <!-- 右侧：无标签内联搜索区 -->
-      <div class="flex flex-wrap items-center gap-3">
+      <div class="search-bar-right">
         <el-input
           v-model="searchQuery.keyword"
           placeholder="搜索课程名称或教师"
@@ -43,16 +43,15 @@
           class="!w-[240px]"
         />
 
-        <el-button type="primary" class="px-5 font-medium ml-1" @click="fetchData">
+        <el-button type="primary" @click="fetchData">
           <el-icon class="mr-1"><Search /></el-icon>查询
         </el-button>
-        <el-button class="px-5 font-medium" @click="handleReset">
+        <el-button plain @click="handleReset">
           重置
         </el-button>
 
         <el-button
           type="success"
-          class="px-5 font-medium"
           @click="handleBatchExport"
         >
           <el-icon class="mr-1"><Download /></el-icon>批量导出{{ selectedRows.length > 0 ? `(${selectedRows.length})` : '' }}
@@ -61,24 +60,24 @@
     </div>
 
     <!-- 报告概览卡片 -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 shrink-0">
+  <div class="card-grid">
     <div
       v-for="item in reportOverviewCards"
       :key="item.label"
-      class="bg-white rounded-xl shadow-sm border border-gray-100 p-5"
+      class="overview-card"
     >
-      <div class="text-sm text-gray-500 mb-2">{{ item.label }}</div>
-      <div class="text-3xl font-bold text-gray-900">{{ item.value }}</div>
-      <div class="text-xs text-gray-400 mt-2">{{ item.tip }}</div>
+      <div class="overview-card-label">{{ item.label }}</div>
+      <div class="overview-card-value">{{ item.value }}</div>
+      <div class="overview-card-tip">{{ item.tip }}</div>
     </div>
   </div>
 
     <!-- 数据表格 -->
-    <div class="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col min-h-0">
-      <div class="flex justify-between items-center bg-gray-50/50 px-5 py-4 border-b border-gray-100 shrink-0">
-        <div class="flex items-center space-x-2">
-          <div class="w-1 h-4 bg-green-500 rounded-full"></div>
-          <span class="font-bold text-gray-700">课堂评估报告台账</span>
+    <div class="table-container">
+      <div class="table-header">
+        <div class="table-title">
+          <div class="w-1 h-4 bg-green-500 rounded-full mr-2"></div>
+          <span>课堂评估报告台账</span>
         </div>
         <el-button plain size="small" @click="fetchData" class="text-gray-600 hover:text-green-600">
           <el-icon class="mr-1"><RefreshRight /></el-icon>刷新列表
@@ -90,7 +89,6 @@
         style="width: 100%" 
         height="100%"
         stripe
-        :header-cell-style="{ background: '#f8fafc', color: '#475569', fontWeight: 'bold' }"
         @selection-change="handleSelectionChange"
       >
         <el-table-column type="selection" width="50" align="center" />
@@ -210,8 +208,8 @@
       </el-table>
 
       <!-- 分页器 -->
-      <div class="flex justify-between items-center bg-white px-5 py-4 border-t border-gray-100 shrink-0">
-        <div class="text-sm text-gray-500 font-medium">总记录数：<span class="text-gray-900 font-bold">{{ total }}</span></div>
+      <div class="pagination-container">
+        <div class="pagination-info">总记录数：<span class="text-gray-900 font-bold">{{ total }}</span></div>
         <el-pagination
           v-model:current-page="searchQuery.page"
           v-model:page-size="searchQuery.size"

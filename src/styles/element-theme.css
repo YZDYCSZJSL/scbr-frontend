@@ -1,0 +1,159 @@
+:root {
+  /* 基础颜色变量体系 - 现代/商务/后台风格 */
+  --el-color-primary: #3b82f6; /* Tailwind Blue 500 */
+  --el-color-primary-light-1: #60a5fa;
+  --el-color-primary-light-2: #93c5fd;
+  --el-color-primary-light-3: #bfdbfe;
+  --el-color-primary-light-5: #dbeafe;
+  --el-color-primary-light-7: #eff6ff;
+  --el-color-primary-light-8: #f5f8ff;
+  --el-color-primary-light-9: #fbfdff;
+  --el-color-primary-dark-2: #2563eb;
+
+  --el-color-success: #10b981; /* Tailwind Emerald 500 */
+  --el-color-success-light-1: #34d399;
+  --el-color-success-light-3: #6ee7b7;
+  --el-color-success-light-5: #a7f3d0;
+  --el-color-success-light-7: #d1fae5;
+  --el-color-success-light-8: #ecfdf5;
+  --el-color-success-light-9: #f2fdf7;
+  --el-color-success-dark-2: #059669;
+
+  --el-color-warning: #f59e0b; /* Tailwind Amber 500 */
+  --el-color-warning-light-1: #fbbf24;
+  --el-color-warning-light-3: #fcd34d;
+  --el-color-warning-light-5: #fde68a;
+  --el-color-warning-light-7: #fef3c7;
+  --el-color-warning-light-8: #fffbeb;
+  --el-color-warning-light-9: #fffdf5;
+  --el-color-warning-dark-2: #d97706;
+
+  --el-color-danger: #ef4444; /* Tailwind Red 500 */
+  --el-color-danger-light-1: #f87171;
+  --el-color-danger-light-3: #fca5a5;
+  --el-color-danger-light-5: #fecaca;
+  --el-color-danger-light-7: #fee2e2;
+  --el-color-danger-light-8: #fef2f2;
+  --el-color-danger-light-9: #fef8f8;
+  --el-color-danger-dark-2: #dc2626;
+
+  --el-color-info: #64748b; /* Tailwind Slate 500 */
+  --el-color-info-light-1: #94a3b8;
+  --el-color-info-light-3: #cbd5e1;
+  --el-color-info-light-5: #e2e8f0;
+  --el-color-info-light-7: #f1f5f9;
+  --el-color-info-light-8: #f8fafc;
+  --el-color-info-light-9: #fbfcfd;
+  --el-color-info-dark-2: #475569;
+
+  /* 边框和背景体系 */
+  --el-border-color: #e2e8f0;
+  --el-border-color-light: #f1f5f9;
+  --el-border-color-lighter: #f8fafc;
+  --el-border-color-extra-light: #fff;
+  --el-bg-color: #ffffff;
+  --el-bg-color-page: #f3f4f6; /* 统一下沉背景色 */
+
+  /* 字体和排版颜色体系 */
+  --el-text-color-primary: #1e293b;
+  --el-text-color-regular: #475569;
+  --el-text-color-secondary: #64748b;
+  --el-text-color-placeholder: #94a3b8;
+
+  /* 基础组件圆角体系 */
+  --el-border-radius-base: 6px;
+  --el-border-radius-small: 4px;
+  --el-border-radius-round: 20px;
+  --el-border-radius-circle: 100%;
+
+  /* 全局组件高度尺寸统一 */
+  --el-component-size: 36px;
+  --el-component-size-small: 32px;
+  --el-component-size-large: 40px;
+
+  /* 按钮字体和高度 */
+  --el-button-size: 36px;
+  --el-font-size-base: 14px;
+}
+
+/* 覆盖原生 Element Plus 的部分强制属性 */
+.el-button {
+  font-weight: 500;
+}
+.el-input__wrapper, .el-textarea__inner, .el-select__wrapper {
+  box-shadow: 0 0 0 1px var(--el-border-color) inset;
+  transition: all 0.2s ease;
+}
+.el-input__wrapper:hover, .el-textarea__inner:hover, .el-select__wrapper:hover {
+  box-shadow: 0 0 0 1px var(--el-color-info-light-3) inset;
+}
+.el-input__wrapper.is-focus, .el-textarea__inner:focus, .el-select__wrapper.is-focused {
+  box-shadow: 0 0 0 1px var(--el-color-primary) inset, 0 0 0 2px var(--el-color-primary-light-7) !important;
+}
+
+.el-table th.el-table__cell {
+  background-color: var(--el-color-info-light-8) !important;
+  color: var(--el-text-color-regular) !important;
+  font-weight: 600 !important;
+  border-bottom: 1px solid var(--el-border-color-light) !important;
+}
+.el-table td.el-table__cell {
+  border-bottom: 1px solid var(--el-border-color-light) !important;
+}
+.el-table__row:hover > td.el-table__cell {
+  background-color: var(--el-color-info-light-8) !important;
+}
+
+/* 标签(Tag)统一样式 */
+.el-tag {
+  border: none !important;
+  font-weight: 500;
+}
+.el-tag--light[type='primary'] {
+  background-color: var(--el-color-primary-light-8);
+  color: var(--el-color-primary);
+}
+.el-tag--light[type='success'] {
+  background-color: var(--el-color-success-light-8);
+  color: var(--el-color-success);
+}
+.el-tag--light[type='warning'] {
+  background-color: var(--el-color-warning-light-8);
+  color: var(--el-color-warning);
+}
+.el-tag--light[type='danger'] {
+  background-color: var(--el-color-danger-light-8);
+  color: var(--el-color-danger);
+}
+.el-tag--light[type='info'] {
+  background-color: var(--el-color-info-light-8);
+  color: var(--el-color-info);
+}
+
+/* Pagination 统一 */
+.el-pagination.is-background .el-pager li:not(.is-disabled).is-active {
+  background-color: var(--el-color-primary);
+  font-weight: 600;
+}
+.el-pagination.is-background .btn-prev, 
+.el-pagination.is-background .btn-next, 
+.el-pagination.is-background .el-pager li {
+  border-radius: var(--el-border-radius-small);
+  background-color: var(--el-bg-color);
+  border: 1px solid var(--el-border-color);
+}
+
+/* Dialog & Drawer */
+.el-dialog, .el-drawer {
+  border-radius: 12px;
+}
+.el-dialog__header, .el-drawer__header {
+  margin-bottom: 0;
+  padding: 20px;
+  border-bottom: 1px solid var(--el-border-color-light);
+  font-weight: 600;
+}
+.el-dialog__footer, .el-drawer__footer {
+  padding: 16px 20px;
+  border-top: 1px solid var(--el-border-color-light);
+}
